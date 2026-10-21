@@ -212,12 +212,16 @@ public static class DistCommand
         if (!windows)
         {
             var sh = Path.Combine(bin, "factorio-mod");
-            if (File.Exists(sh)) File.SetUnixFileMode(sh, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
-                                                              UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
-                                                              UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+            if (!OperatingSystem.IsWindows() && File.Exists(sh))
+            {
+                File.SetUnixFileMode(sh, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+                                         UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
+                                         UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+            }
             var wrapper = Path.Combine(bin, "factorio-mod.sh");
             File.WriteAllText(wrapper, "#!/bin/sh\n# The installed factorio-mod.\nexec \"$(dirname \"$0\")/factorio-mod\" \"$@\"\n");
-            File.SetUnixFileMode(wrapper, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            if (!OperatingSystem.IsWindows())
+                File.SetUnixFileMode(wrapper, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         }
     }
 

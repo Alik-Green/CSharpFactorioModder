@@ -191,10 +191,7 @@ jobs:
           Run-Logged "Generator.Tests" { dotnet test tests\Generator.Tests -c Release --nologo }
           Run-Logged "Transpile.Tests" { dotnet test tests\Transpile.Tests -c Release --nologo }
           Run-Logged "Analyzer.Tests" { dotnet test tests\Analyzer.Tests -c Release --nologo }
-
-      - name: Build Windows installer (.exe)
-        shell: cmd
-        run: installer\build.cmd ${{ steps.meta.outputs.version }}
+          Run-Logged "installer/build.cmd" { cmd /c "installer\build.cmd ${{ steps.meta.outputs.version }}" }
 
       - name: Smoke-test Windows dist and installer (.exe)
         shell: pwsh
