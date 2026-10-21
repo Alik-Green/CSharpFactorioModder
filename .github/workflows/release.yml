@@ -100,13 +100,13 @@ jobs:
           }
           smoke_sh=$(mktemp)
           cat <<'SMOKE' > "$smoke_sh"
-          ./dist/bin/factorio-mod doctor
-          ./dist/bin/factorio-mod build dist/mods/HelloFactorio
           work="$(mktemp -d)"
+          (cd "$work" && "$GITHUB_WORKSPACE/dist/bin/factorio-mod" doctor)
+          (cd "$work" && "$GITHUB_WORKSPACE/dist/bin/factorio-mod" build "$GITHUB_WORKSPACE/dist/mods/HelloFactorio")
           tar -xzf "release/FactorioCSharpModder-${VERSION}-linux-x64.tar.gz" -C "$work"
           "$work/FactorioCSharpModder-${VERSION}-linux-x64/install.sh" --prefix "$work/prefix" --yes
           "$work/prefix/bin/factorio-mod" --version | grep -F "${VERSION}"
-          "$work/prefix/bin/factorio-mod" doctor
+          (cd "$work" && "$work/prefix/bin/factorio-mod" doctor)
           mkdir -p "$work/smoke"
           (cd "$work/smoke" && "$work/prefix/bin/factorio-mod" new SmokeTest)
           test -f "$work/smoke/SmokeTest/build/mods/SmokeTest_0.1.0.zip" || test -f "$work/prefix/lib/factorio-mod/build/mods/SmokeTest_0.1.0.zip"
@@ -163,26 +163,32 @@ jobs:
         run: |
           try {
             $ver = "${{ needs.unix.outputs.version }}"
-            & .\dist\bin\factorio-mod.exe doctor
-            if ($LASTEXITCODE -ne 0) { throw "dist doctor failed ($LASTEXITCODE)" }
-            & .\dist\bin\factorio-mod.exe build dist\mods\HelloFactorio
-            if ($LASTEXITCODE -ne 0) { throw "dist build HelloFactorio failed ($LASTEXITCODE)" }
+            $distPath = (Resolve-Path "dist").Path
             $installer = Resolve-Path "release\FactorioCSharpModder-$ver-win64.exe"
             $installDir = Join-Path $env:RUNNER_TEMP "FactorioCSharpModderInstall"
             $smokeDir = Join-Path $env:RUNNER_TEMP "FactorioSmoke"
             New-Item -ItemType Directory -Force -Path $smokeDir | Out-Null
 
+            Push-Location $smokeDir
+            try {
+              & "$distPath\bin\factorio-mod.exe" doctor
+              if ($LASTEXITCODE -ne 0) { throw "dist doctor failed ($LASTEXITCODE)" }
+              & "$distPath\bin\factorio-mod.exe" build "$distPath\mods\HelloFactorio"
+              if ($LASTEXITCODE -ne 0) { throw "dist build HelloFactorio failed ($LASTEXITCODE)" }
+            } finally {
+              Pop-Location
+            }
+
             $proc = Start-Process -FilePath $installer.Path -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/TEMPLATE', "/DIR=$installDir") -Wait -PassThru
             if ($proc.ExitCode -ne 0) { throw "Installer exited with code $($proc.ExitCode)" }
 
             $exe = Join-Path $installDir 'bin\factorio-mod.exe'
-            & $exe --version
-            if ($LASTEXITCODE -ne 0) { throw "factorio-mod --version failed" }
-            & $exe doctor
-            if ($LASTEXITCODE -ne 0) { throw "factorio-mod doctor failed" }
-
             Push-Location $smokeDir
             try {
+              & $exe --version
+              if ($LASTEXITCODE -ne 0) { throw "factorio-mod --version failed" }
+              & $exe doctor
+              if ($LASTEXITCODE -ne 0) { throw "factorio-mod doctor failed" }
               & $exe new SmokeTest
               if ($LASTEXITCODE -ne 0) { throw "factorio-mod new SmokeTest failed" }
             } finally {
