@@ -9,7 +9,7 @@
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <DebugType>none</DebugType>
-    <NoWarn>$(NoWarn);CS1591;CS1573;CS1574;CS1587</NoWarn>
+    <NoWarn>$(NoWarn);CS1591;CS1573;CS1574;CS1587;CS0108;CS0114</NoWarn>
     <BaseIntermediateOutputPath>../../build/obj/Factorio.Bindings/</BaseIntermediateOutputPath>
     <OutputPath>../../build/bin/Factorio.Bindings/</OutputPath>
   </PropertyGroup>
