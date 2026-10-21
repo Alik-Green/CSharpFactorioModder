@@ -56,13 +56,12 @@ jobs:
       - name: Run full test suite (xUnit + Lua 5.2 mock & prototype tests)
         run: |
           log_cmd() {
-            local tmp
+            local tmp msg
             tmp=$(mktemp)
             if ! "$@" >"$tmp" 2>&1; then
               cat "$tmp"
-              tail -n 60 "$tmp" | while IFS= read -r l; do
-                [ -n "$l" ] && echo "::error::$l"
-              done
+              msg=$(tail -n 60 "$tmp" | sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g')
+              echo "::error::Command failed ($*):%0A${msg}"
               rm -f "$tmp"
               return 1
             fi
@@ -72,6 +71,7 @@ jobs:
           log_cmd dotnet test tests/Generator.Tests -c Release --nologo
           log_cmd dotnet test tests/Transpile.Tests -c Release --nologo
           log_cmd dotnet test tests/Analyzer.Tests -c Release --nologo
+          log_cmd dotnet tools/Factorio.ModTool/bin/Release/net8.0/factorio-mod.dll build mods/HelloFactorio mods/GasExtractor mods/DemoChemistry
           log_cmd make test
 
       - name: Package macOS arm64 and Linux x64 archives
@@ -82,13 +82,12 @@ jobs:
       - name: Smoke-test Linux dist and installer archive
         run: |
           log_script() {
-            local tmp
+            local tmp msg
             tmp=$(mktemp)
             if ! bash -e -x "$1" >"$tmp" 2>&1; then
               cat "$tmp"
-              tail -n 50 "$tmp" | while IFS= read -r l; do
-                [ -n "$l" ] && echo "::error::$l"
-              done
+              msg=$(tail -n 60 "$tmp" | sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g')
+              echo "::error::Linux smoke test failed:%0A${msg}"
               rm -f "$tmp"
               return 1
             fi
@@ -158,33 +157,39 @@ jobs:
       - name: Smoke-test Windows dist and installer (.exe)
         shell: pwsh
         run: |
-          $ver = "${{ needs.unix.outputs.version }}"
-          & .\dist\bin\factorio-mod.exe doctor
-          if ($LASTEXITCODE -ne 0) { throw "dist doctor failed" }
-          & .\dist\bin\factorio-mod.exe build dist\mods\HelloFactorio
-          if ($LASTEXITCODE -ne 0) { throw "dist build HelloFactorio failed" }
-          $installer = Resolve-Path "release\FactorioCSharpModder-$ver-win64.exe"
-          $installDir = Join-Path $env:RUNNER_TEMP "FactorioCSharpModderInstall"
-          $smokeDir = Join-Path $env:RUNNER_TEMP "FactorioSmoke"
-          New-Item -ItemType Directory -Force -Path $smokeDir | Out-Null
-
-          $proc = Start-Process -FilePath $installer.Path -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/TEMPLATE', "/DIR=$installDir") -Wait -PassThru
-          if ($proc.ExitCode -ne 0) { throw "Installer exited with code $($proc.ExitCode)" }
-
-          $exe = Join-Path $installDir 'bin\factorio-mod.exe'
-          & $exe --version
-          if ($LASTEXITCODE -ne 0) { throw "factorio-mod --version failed" }
-          & $exe doctor
-          if ($LASTEXITCODE -ne 0) { throw "factorio-mod doctor failed" }
-
-          Push-Location $smokeDir
           try {
-            & $exe new SmokeTest
-            if ($LASTEXITCODE -ne 0) { throw "factorio-mod new SmokeTest failed" }
-          } finally {
-            Pop-Location
+            $ver = "${{ needs.unix.outputs.version }}"
+            & .\dist\bin\factorio-mod.exe doctor
+            if ($LASTEXITCODE -ne 0) { throw "dist doctor failed ($LASTEXITCODE)" }
+            & .\dist\bin\factorio-mod.exe build dist\mods\HelloFactorio
+            if ($LASTEXITCODE -ne 0) { throw "dist build HelloFactorio failed ($LASTEXITCODE)" }
+            $installer = Resolve-Path "release\FactorioCSharpModder-$ver-win64.exe"
+            $installDir = Join-Path $env:RUNNER_TEMP "FactorioCSharpModderInstall"
+            $smokeDir = Join-Path $env:RUNNER_TEMP "FactorioSmoke"
+            New-Item -ItemType Directory -Force -Path $smokeDir | Out-Null
+
+            $proc = Start-Process -FilePath $installer.Path -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/TEMPLATE', "/DIR=$installDir") -Wait -PassThru
+            if ($proc.ExitCode -ne 0) { throw "Installer exited with code $($proc.ExitCode)" }
+
+            $exe = Join-Path $installDir 'bin\factorio-mod.exe'
+            & $exe --version
+            if ($LASTEXITCODE -ne 0) { throw "factorio-mod --version failed" }
+            & $exe doctor
+            if ($LASTEXITCODE -ne 0) { throw "factorio-mod doctor failed" }
+
+            Push-Location $smokeDir
+            try {
+              & $exe new SmokeTest
+              if ($LASTEXITCODE -ne 0) { throw "factorio-mod new SmokeTest failed" }
+            } finally {
+              Pop-Location
+            }
+            dotnet new list factorio-mod
+          } catch {
+            $msg = $_.Exception.ToString() -replace '%','%25' -replace "`r",'%0D' -replace "`n",'%0A'
+            Write-Output "::error::Windows smoke test failed:%0A$msg"
+            throw
           }
-          dotnet new list factorio-mod
 
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4

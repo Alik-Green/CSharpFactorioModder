@@ -34,7 +34,13 @@ namespace Factorio.Data
         /// <see cref="Mod"/> write the prefix.
         /// </para>
         /// </summary>
-        public static string? Source { get; set; }
+        private static readonly System.Threading.AsyncLocal<string?> CurrentSource = new();
+
+        public static string? Source
+        {
+            get => CurrentSource.Value;
+            set => CurrentSource.Value = value;
+        }
 
         /// <summary>
         /// A file inside this mod, e.g. <c>graphics/entity/my-machine.png</c>, as
