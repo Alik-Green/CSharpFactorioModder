@@ -17,6 +17,11 @@ public static class Packager
         string? ZipPath,
         IReadOnlyList<string> Warnings);
 
+    public static string DefaultOutputDirectory(ToolchainSettings settings) =>
+        settings.BuildDirectoryOverride != null
+            ? Path.Combine(settings.BuildDirectory, "mods")
+            : Path.Combine(Directory.GetCurrentDirectory(), "build", "mods");
+
     private static readonly Regex QuotedResource = new(
         @"['""](?<path>(?:__[^'""/]+__/)?[A-Za-z0-9_./-]+\.(?:png|jpg|ogg|wav))['""]",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -31,7 +36,7 @@ public static class Packager
         bool zip = true,
         string? outputDirectory = null)
     {
-        var baseOut = outputDirectory ?? Path.Combine(settings.BuildDirectory, "mods");
+        var baseOut = outputDirectory ?? DefaultOutputDirectory(settings);
         Directory.CreateDirectory(baseOut);
 
         var folderName = $"{project.Name}_{project.Version}";
