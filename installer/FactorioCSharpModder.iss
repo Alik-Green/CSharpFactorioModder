@@ -127,6 +127,11 @@ function HasDotnet(): Boolean;
 var
   ResultCode: Integer;
 begin
+  if FileExists(ExpandConstant('{%USERPROFILE|}\.dotnet\dotnet.exe')) then
+  begin
+    Result := True;
+    exit;
+  end;
   if not Exec(ExpandConstant('{cmd}'), '/C dotnet --version >nul 2>&1', '',
               SW_HIDE, ewWaitUntilTerminated, ResultCode) then
   begin
@@ -197,7 +202,9 @@ begin
   if WizardForm <> nil then
     WizardForm.StatusLabel.Caption := 'Installing the Factorio mod template...';
 
-  if not Exec(ExpandConstant('{app}\bin\factorio-mod.exe'), 'template', ExpandConstant('{app}'),
+  if not Exec(ExpandConstant('{cmd}'),
+              '/C ""' + ExpandConstant('{app}\bin\factorio-mod.cmd') + '" template"',
+              ExpandConstant('{app}'),
               SW_HIDE, ewWaitUntilTerminated, ResultCode) or (ResultCode <> 0) then
   begin
     MsgBox('The project template could not be installed (exit code ' + IntToStr(ResultCode) + ').' + #13#10 + #13#10 +

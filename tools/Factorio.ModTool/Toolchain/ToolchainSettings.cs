@@ -187,7 +187,7 @@ public sealed class ToolchainSettings
         return new ToolchainSettings
         {
             Root = root,
-            DotnetPath = Environment.GetEnvironmentVariable("DOTNET") ?? "dotnet",
+            DotnetPath = ResolveDefaultDotnet(),
             CompilerRepo = cs.GetProperty("repository").GetString()!,
             CompilerCommit = cs.GetProperty("commit").GetString()!,
             CompilerCloneDir = cloneDir,
@@ -228,6 +228,40 @@ public sealed class ToolchainSettings
 
         return versions;
     }
+
+    private static string ResolveDefaultDotnet()
+    {
+        var env = Environment.GetEnvironmentVariable("DOTNET");
+        if (!string.IsNullOrWhiteSpace(env)) return env;
+
+        var exeName = OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet";
+        try
+        {
+            var runtimeDir = RuntimeEnvironment.GetRuntimeDirectory();
+            var hostMuxer = Path.GetFullPath(Path.Combine(runtimeDir, "..", "..", "..", exeName));
+            if (File.Exists(hostMuxer)) return hostMuxer;
+        }
+        catch
+        {
+            // Fall through to DOTNET_ROOT / PATH.
+        }
+
+        var dotnetRoot = Environment.GetEnvironmentVariable("DOTNET_ROOT");
+        if (!string.IsNullOrWhiteSpace(dotnetRoot))
+        {
+            var fromRoot = Path.Combine(dotnetRoot, exeName);
+            if (File.Exists(fromRoot)) return fromRoot;
+        }
+
+        var userDotnet = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".dotnet",
+            exeName);
+        if (Shell.Find("dotnet") == null && File.Exists(userDotnet))
+            return userDotnet;
+
+        return "dotnet";
+    }
 }
 
 /// <summary>An expected, user-facing failure: printed without a stack trace, exit code 1.</summary>
@@ -250,6 +284,8 @@ public static class Shell
             UseShellExecute = false,
             WorkingDirectory = workingDirectory ?? Directory.GetCurrentDirectory(),
         };
+        if (!psi.Environment.ContainsKey("DOTNET_ROLL_FORWARD"))
+            psi.Environment["DOTNET_ROLL_FORWARD"] = "LatestMajor";
         foreach (var a in args) psi.ArgumentList.Add(a);
         try
         {

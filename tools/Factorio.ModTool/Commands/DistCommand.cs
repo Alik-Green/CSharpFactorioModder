@@ -205,6 +205,12 @@ public static class DistCommand
         stream.WriteLine("@echo off");
         stream.WriteLine("rem The installed factorio-mod. `factorio-mod <command>` once this folder is on PATH.");
         stream.WriteLine("setlocal");
+        stream.WriteLine("if not defined DOTNET_ROLL_FORWARD set \"DOTNET_ROLL_FORWARD=LatestMajor\"");
+        stream.WriteLine("if not defined DOTNET_ROOT (");
+        stream.WriteLine("  if not exist \"%ProgramFiles%\\dotnet\\shared\\Microsoft.NETCore.App\" (");
+        stream.WriteLine("    if exist \"%USERPROFILE%\\.dotnet\\shared\\Microsoft.NETCore.App\" set \"DOTNET_ROOT=%USERPROFILE%\\.dotnet\"");
+        stream.WriteLine("  )");
+        stream.WriteLine(")");
         stream.WriteLine($"\"%~dp0{(windows ? "factorio-mod.exe" : "factorio-mod")}\" %*");
         stream.WriteLine("exit /b %errorlevel%");
         stream.Dispose();
@@ -219,7 +225,14 @@ public static class DistCommand
                                          UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
             }
             var wrapper = Path.Combine(bin, "factorio-mod.sh");
-            File.WriteAllText(wrapper, "#!/bin/sh\n# The installed factorio-mod.\nexec \"$(dirname \"$0\")/factorio-mod\" \"$@\"\n");
+            File.WriteAllText(wrapper,
+                "#!/bin/sh\n" +
+                "# The installed factorio-mod.\n" +
+                "export DOTNET_ROLL_FORWARD=\"${DOTNET_ROLL_FORWARD:-LatestMajor}\"\n" +
+                "if [ -z \"$DOTNET_ROOT\" ] && [ ! -d \"/usr/share/dotnet/shared/Microsoft.NETCore.App\" ] && [ -d \"$HOME/.dotnet/shared/Microsoft.NETCore.App\" ]; then\n" +
+                "  export DOTNET_ROOT=\"$HOME/.dotnet\"\n" +
+                "fi\n" +
+                "exec \"$(dirname \"$0\")/factorio-mod\" \"$@\"\n");
             if (!OperatingSystem.IsWindows())
                 File.SetUnixFileMode(wrapper, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         }
