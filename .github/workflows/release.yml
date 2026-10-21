@@ -72,7 +72,11 @@ jobs:
           log_cmd dotnet test tests/Transpile.Tests -c Release --nologo
           log_cmd dotnet test tests/Analyzer.Tests -c Release --nologo
           log_cmd dotnet tools/Factorio.ModTool/bin/Release/net8.0/factorio-mod.dll build mods/HelloFactorio mods/GasExtractor mods/DemoChemistry
-          log_cmd make test
+          log_cmd lua5.2 tests/lua/run_mod.lua "build/mods/HelloFactorio_$(python3 -c 'import json;print(json.load(open("mods/HelloFactorio/mod.json"))["version"])')/control.lua"
+          log_cmd lua5.2 tests/lua/gas_extractor_test.lua "build/mods/GasExtractor_$(python3 -c 'import json;print(json.load(open("mods/GasExtractor/mod.json"))["version"])')/control.lua"
+          log_cmd lua5.2 tests/lua/demo_chemistry_test.lua "build/mods/DemoChemistry_$(python3 -c 'import json;print(json.load(open("mods/DemoChemistry/mod.json"))["version"])')/control.lua"
+          log_cmd lua5.2 tests/lua/data_inherit_test.lua "build/mods/DemoChemistry_$(python3 -c 'import json;print(json.load(open("mods/DemoChemistry/mod.json"))["version"])')/data.lua"
+          log_cmd lua5.2 tests/lua/util_test.lua
 
       - name: Package macOS arm64 and Linux x64 archives
         run: |

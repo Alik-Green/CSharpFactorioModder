@@ -73,12 +73,14 @@ public static class ModBuilder
             var errors = analyzerFindings.Where(f => f.IsError).ToList();
             if (errors.Count > 0)
             {
+                var baseOut = options.OutputDirectory ?? Path.Combine(settings.BuildDirectory, "mods");
+                var plannedModDir = Path.Combine(baseOut, $"{project.Name}_{project.Version}");
                 var mapped = errors
                     .Select(e => new LuaCheck.Finding(e.File, e.Line, $"error {e.Id}: {e.Message}"))
                     .ToList();
                 return new BuildResult(
                     Ok: false,
-                    ModDirectory: "",
+                    ModDirectory: plannedModDir,
                     ZipPath: null,
                     Modules: Array.Empty<string>(),
                     DroppedModules: Array.Empty<string>(),
