@@ -68,7 +68,7 @@
       <_FactorioIdeEntryFile>$(IntermediateOutputPath)FactorioIdeRunner.g.cs</_FactorioIdeEntryFile>
     </PropertyGroup>
     <WriteLinesToFile File="$(_FactorioIdeEntryFile)"
-                      Lines="public static class __FactorioIdeRunner { public static int Main(string[] args) =&gt; global::Factorio.IdeRunner.Run(args); }"
+                      Lines="public static class __FactorioIdeRunner { public static int Main(string[] args) =&gt; global::Factorio.IdeRunner.Run(args)%3B }"
                       Overwrite="true"
                       WriteOnlyWhenDifferent="true" />
     <ItemGroup>
