@@ -2,6 +2,8 @@ name: release
 
 on:
   push:
+    branches:
+      - arena/bb8081bc-csharpfactoriomodder
     tags:
       - 'v*'
   workflow_dispatch:
@@ -32,7 +34,7 @@ jobs:
             if ("$env:GITHUB_REF" -like "refs/tags/v*") {
               $ver = "$env:GITHUB_REF" -replace '^refs/tags/v',''
             } else {
-              $ver = "1.0.1"
+              $ver = "1.0.2"
             }
           }
           $ver = $ver.TrimStart('v')
@@ -78,18 +80,24 @@ jobs:
           Run-Logged "Generator.Tests" { dotnet test tests\Generator.Tests -c Release --nologo }
           Run-Logged "Transpile.Tests" { dotnet test tests\Transpile.Tests -c Release --nologo }
           Run-Logged "Analyzer.Tests" { dotnet test tests\Analyzer.Tests -c Release --nologo }
+          Run-Logged "dotnet build HelloFactorio" { dotnet build mods\HelloFactorio\HelloFactorio.csproj -c Release --nologo }
+          Run-Logged "dotnet build DemoChemistry" { dotnet build mods\DemoChemistry\DemoChemistry.csproj -c Release --nologo }
+          Run-Logged "dotnet build GasExtractor" { dotnet build mods\GasExtractor\GasExtractor.csproj -c Release --nologo }
           Run-Logged "installer/build.cmd" { cmd /c "installer\build.cmd ${{ steps.meta.outputs.version }}" }
 
-      - name: Smoke-test Windows installer on both .NET 8 and isolated .NET 10 (Rider setup)
+      - name: Smoke-test Rider Run button & IntelliSense DLL on isolated .NET 10 SDK
         shell: pwsh
         run: |
           try {
             $ver = "${{ steps.meta.outputs.version }}"
-            $distPath = (Resolve-Path "dist").Path
             $installer = Resolve-Path "release\FactorioCSharpModder-$ver-win64.exe"
             $installDir = Join-Path $env:RUNNER_TEMP "FactorioCSharpModderInstall"
             $smokeDir = Join-Path $env:RUNNER_TEMP "FactorioSmoke"
             New-Item -ItemType Directory -Force -Path $smokeDir | Out-Null
+
+            # Create fake %APPDATA%\Factorio directory so IdeRunner deploys the built zip automatically
+            $factorioAppData = Join-Path $env:APPDATA "Factorio"
+            New-Item -ItemType Directory -Force -Path $factorioAppData | Out-Null
 
             # Install isolated .NET 10 SDK with NO .NET 8 runtime (mirrors JetBrains Rider ~/.dotnet)
             $dotnet10Dir = Join-Path $env:RUNNER_TEMP "dotnet10"
@@ -97,28 +105,33 @@ jobs:
             Invoke-WebRequest -Uri "https://builds.dotnet.microsoft.com/dotnet/scripts/v1/dotnet-install.ps1" -OutFile $installScript
             & $installScript -Channel 10.0 -InstallDir $dotnet10Dir -NoPath
 
+            # Deliberately do NOT put $installDir\bin on PATH or set FACTORIO_MOD_HOME,
+            # proving even an already-open Rider window finds Factorio.Bindings.dll & factorio-mod via Registry!
             $env:DOTNET_ROOT = $dotnet10Dir
             $env:DOTNET_MULTILEVEL_LOOKUP = "0"
             Remove-Item Env:DOTNET_ROLL_FORWARD -ErrorAction SilentlyContinue
-            $env:PATH = "$installDir\bin;$dotnet10Dir;$env:PATH"
+            Remove-Item Env:FACTORIO_MOD_HOME -ErrorAction SilentlyContinue
+            $env:PATH = "$dotnet10Dir;$env:PATH"
 
             $proc = Start-Process -FilePath $installer.Path -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/TEMPLATE', "/DIR=$installDir") -Wait -PassThru
             if ($proc.ExitCode -ne 0) { throw "Installer exited with code $($proc.ExitCode)" }
 
-            $exe = Join-Path $installDir 'bin\factorio-mod.exe'
+            if (-not (Test-Path "$installDir\lib\Factorio.Bindings.dll")) { throw "Missing lib\Factorio.Bindings.dll" }
+            if (-not (Test-Path "$installDir\lib\Factorio.Bindings.xml")) { throw "Missing lib\Factorio.Bindings.xml" }
+
             Push-Location $smokeDir
             try {
-              & $exe --version
-              if ($LASTEXITCODE -ne 0) { throw "factorio-mod.exe --version failed under .NET 10" }
-              & $exe doctor
-              if ($LASTEXITCODE -ne 0) { throw "factorio-mod.exe doctor failed under .NET 10" }
               & "$dotnet10Dir\dotnet.exe" new factorio-mod -n GreenMod -o "$smokeDir\GreenMod"
               if ($LASTEXITCODE -ne 0) { throw "dotnet new factorio-mod failed under .NET 10" }
-              & "$dotnet10Dir\dotnet.exe" build "$smokeDir\GreenMod\GreenMod.csproj"
-              if ($LASTEXITCODE -ne 0) { throw "dotnet build GreenMod.csproj failed under .NET 10" }
-              $zips = @(Get-ChildItem -Path "$smokeDir\GreenMod\build\mods" -Filter "*.zip")
-              if ($zips.Count -eq 0) { throw "No built mod zip found under GreenMod\build\mods" }
-              Write-Host "Built under isolated .NET 10 SDK: $($zips[0].FullName)"
+
+              # Exact command Rider runs when pressing the green Run button right out of the template:
+              & "$dotnet10Dir\dotnet.exe" run --project "$smokeDir\GreenMod\GreenMod.csproj"
+              if ($LASTEXITCODE -ne 0) { throw "dotnet run GreenMod.csproj failed under .NET 10" }
+
+              $builtZip = "$smokeDir\GreenMod\build\mods\GreenMod_0.1.0.zip"
+              $deployedZip = "$factorioAppData\mods\GreenMod_0.1.0.zip"
+              if (-not (Test-Path $builtZip)) { throw "Expected built zip not found: $builtZip" }
+              if (-not (Test-Path $deployedZip)) { throw "Expected deployed zip in Factorio mods dir not found: $deployedZip" }
             } finally {
               Pop-Location
             }
@@ -136,7 +149,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: pwsh
