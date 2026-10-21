@@ -55,9 +55,9 @@ public sealed class ModProject
     public string Bindings { get; init; } = "runtime";
     public IReadOnlyList<string> Sources { get; init; } = new[] { "src" };
     public IReadOnlyList<string> DataSources { get; init; } = Array.Empty<string>();
-    public IReadOnlyList<string> Resources { get; init; } = Array.Empty<string>();
-    public IReadOnlyList<string> Lua { get; init; } = Array.Empty<string>();
-    public IReadOnlyList<string> Files { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> Resources { get; init; } = new[] { "resources" };
+    public IReadOnlyList<string> Lua { get; init; } = new[] { "lua" };
+    public IReadOnlyList<string> Files { get; init; } = new[] { "thumbnail.png", "changelog.txt" };
     public BuildSettings Build { get; init; } = new();
 
     /// <summary>Loads and validates the <c>mod.json</c> manifest in <paramref name="directory"/>.</summary>
@@ -134,9 +134,9 @@ public sealed class ModProject
             Bindings = string.IsNullOrWhiteSpace(dto.Bindings) ? "runtime" : dto.Bindings.Trim(),
             Sources = sources,
             DataSources = dataSources,
-            Resources = dto.Resources ?? (IReadOnlyList<string>)Array.Empty<string>(),
-            Lua = dto.Lua ?? (IReadOnlyList<string>)Array.Empty<string>(),
-            Files = dto.Files ?? (IReadOnlyList<string>)Array.Empty<string>(),
+            Resources = dto.Resources ?? (IReadOnlyList<string>)new[] { "resources" },
+            Lua = dto.Lua ?? (IReadOnlyList<string>)new[] { "lua" },
+            Files = dto.Files ?? (IReadOnlyList<string>)new[] { "thumbnail.png", "changelog.txt" },
             Build = build,
         };
     }
