@@ -124,16 +124,30 @@ jobs:
   windows:
     name: Build & test (Windows installer)
     runs-on: windows-latest
-    needs: unix
     steps:
       - uses: actions/checkout@v4
+
+      - name: Determine release version
+        id: meta
+        shell: pwsh
+        run: |
+          $ver = "${{ inputs.version }}"
+          if ([string]::IsNullOrWhiteSpace($ver)) {
+            if ("$env:GITHUB_REF" -like "refs/tags/v*") {
+              $ver = "$env:GITHUB_REF" -replace '^refs/tags/v',''
+            } else {
+              $ver = "1.0.0"
+            }
+          }
+          $ver = $ver.TrimStart('v')
+          "version=$ver" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Setup .NET 8 SDK
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
 
-      - name: Ensure Inno Setup 6 is installed
+      - name: Ensure Inno Setup 6 and Lua compiler are installed
         shell: pwsh
         run: |
           $iscc86 = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
@@ -141,28 +155,39 @@ jobs:
           if (-not (Test-Path $iscc86) -and -not (Test-Path $iscc64)) {
             choco install innosetup --no-progress -y
           }
+          if (-not (Get-Command luac -ErrorAction SilentlyContinue) -and -not (Get-Command luac52 -ErrorAction SilentlyContinue)) {
+            choco install lua --no-progress -y
+          }
 
       - name: Bootstrap CSharp.lua compiler & run xUnit tests on Windows
-        shell: cmd
+        shell: pwsh
         run: |
-          call factorio-mod.cmd bootstrap
-          if errorlevel 1 exit /b 1
-          dotnet test tests\Generator.Tests -c Release --nologo
-          if errorlevel 1 exit /b 1
-          dotnet test tests\Transpile.Tests -c Release --nologo
-          if errorlevel 1 exit /b 1
-          dotnet test tests\Analyzer.Tests -c Release --nologo
-          if errorlevel 1 exit /b 1
+          $ErrorActionPreference = 'Continue'
+          function Run-Logged([string]$Label, [scriptblock]$Block) {
+            $out = & $Block 2>&1 | Out-String
+            $code = $LASTEXITCODE
+            Write-Host $out
+            if ($code -ne 0) {
+              $lines = ($out -split "`r?`n") | Select-Object -Last 60
+              $msg = (($lines -join "`n") -replace '%','%25' -replace "`r",'%0D' -replace "`n",'%0A')
+              Write-Output "::error::Windows step failed ($Label):%0A$msg"
+              exit $code
+            }
+          }
+          Run-Logged "bootstrap" { cmd /c "factorio-mod.cmd bootstrap" }
+          Run-Logged "Generator.Tests" { dotnet test tests\Generator.Tests -c Release --nologo }
+          Run-Logged "Transpile.Tests" { dotnet test tests\Transpile.Tests -c Release --nologo }
+          Run-Logged "Analyzer.Tests" { dotnet test tests\Analyzer.Tests -c Release --nologo }
 
       - name: Build Windows installer (.exe)
         shell: cmd
-        run: installer\build.cmd ${{ needs.unix.outputs.version }}
+        run: installer\build.cmd ${{ steps.meta.outputs.version }}
 
       - name: Smoke-test Windows dist and installer (.exe)
         shell: pwsh
         run: |
           try {
-            $ver = "${{ needs.unix.outputs.version }}"
+            $ver = "${{ steps.meta.outputs.version }}"
             $distPath = (Resolve-Path "dist").Path
             $installer = Resolve-Path "release\FactorioCSharpModder-$ver-win64.exe"
             $installDir = Join-Path $env:RUNNER_TEMP "FactorioCSharpModderInstall"

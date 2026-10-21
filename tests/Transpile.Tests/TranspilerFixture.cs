@@ -86,17 +86,18 @@ public sealed class TranspilerFixture : IDisposable
         foreach (var s in sources)
             Assert.True(File.Exists(s), "missing source: " + s);
 
+        var rsp = Path.Combine(outDir, "compile.rsp");
+        static string Rel(string p) => Path.GetRelativePath(Root, p).Replace('\\', '/');
+        File.WriteAllText(rsp, $"-s {string.Join(";", sources.Select(Rel))} -d {Rel(outDir)} -noconcurrent\n");
+
         var psi = new ProcessStartInfo("dotnet")
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            WorkingDirectory = WorkDir,
+            WorkingDirectory = Root,
         };
         psi.ArgumentList.Add(CompilerDll);
-        psi.ArgumentList.Add("-s");
-        psi.ArgumentList.Add(string.Join(";", sources));
-        psi.ArgumentList.Add("-d");
-        psi.ArgumentList.Add(outDir);
+        psi.ArgumentList.Add("@" + rsp);
 
         using var p = Process.Start(psi)!;
         var stdout = p.StandardOutput.ReadToEnd();
