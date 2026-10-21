@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<TestSequence>
+  <Test Name="Factorio.Analyzers.Tests.RepositoryTests.BindingsAreClean" DisplayName="Factorio.Analyzers.Tests.RepositoryTests.BindingsAreClean" Source="/home/user/tests/Analyzer.Tests/bin/Release/net8.0/Analyzer.Tests.dll" Completed="True" />
+  <Test Name="Factorio.Analyzers.Tests.RepositoryTests.BuiltAssemblyIsALoadableRoslynAnalyzer" DisplayName="Factorio.Analyzers.Tests.RepositoryTests.BuiltAssemblyIsALoadableRoslynAnalyzer" Source="/home/user/tests/Analyzer.Tests/bin/Release/net8.0/Analyzer.Tests.dll" Completed="True" />
+  <Test Name="Factorio.Analyzers.Tests.RepositoryTests.ShippedModIsClean" DisplayName="Factorio.Analyzers.Tests.RepositoryTests.ShippedModIsClean(name: &quot;HelloFactorio&quot;)" Source="/home/user/tests/Analyzer.Tests/bin/Release/net8.0/Analyzer.Tests.dll" Completed="True" />
+  <Test Name="Factorio.Analyzers.Tests.RepositoryTests.ShippedModIsClean" DisplayName="Factorio.Analyzers.Tests.RepositoryTests.ShippedModIsClean(name: &quot;GasExtractor&quot;)" Source="/home/user/tests/Analyzer.Tests/bin/Release/net8.0/Analyzer.Tests.dll" Completed="True" />
+  <Test Name="Factorio.Analyzers.Tests.RepositoryTests.AnalyzeCommandFailsOnABadMod" DisplayName="Factorio.Analyzers.Tests.RepositoryTests.AnalyzeCommandFailsOnABadMod" Source="/home/user/tests/Analyzer.Tests/bin/Release/net8.0/Analyzer.Tests.dll" Completed="True" />
+  <Test Name="Factorio.Analyzers.Tests.RepositoryTests.BuildStopsOnAnalyzerErrors" DisplayName="Factorio.Analyzers.Tests.RepositoryTests.BuildStopsOnAnalyzerErrors" Source="/home/user/tests/Analyzer.Tests/bin/Release/net8.0/Analyzer.Tests.dll" Completed="True" />
+  <Test Name="Factorio.Analyzers.Tests.RuleTests.EveryRuleHasAFixture" DisplayName="Factorio.Analyzers.Tests.RuleTests.EveryRuleHasAFixture" Source="/home/user/tests/Analyzer.Tests/bin/Release/net8.0/Analyzer.Tests.dll" Completed="True" />
+  <Test Name="Factorio.Analyzers.Tests.RuleTests.NegativeCaseIsSilent" DisplayName="Factorio.Analyzers.Tests.RuleTests.NegativeCaseIsSilent" Source="/home/user/tests/Analyzer.Tests/bin/Release/net8.0/Analyzer.Tests.dll" Completed="True" />
+  <Test Name="Factorio.Analyzers.Tests.RuleTests.RuleClassesAdvertiseTheirCatalogDescriptors" DisplayName="Factorio.Analyzers.Tests.RuleTests.RuleClassesAdvertiseTheirCatalogDescriptors" Source="/home/user/tests/Analyzer.Tests/bin/Release/net8.0/Analyzer.Tests.dll" Completed="True" />
+  <Test Name="Factorio.Analyzers.Tests.RuleTests.PositiveCaseReportsExactlyThatRule" DisplayName="Factorio.Analyzers.Tests.RuleTests.PositiveCaseReportsExactlyThatRule" Source="/home/user/tests/Analyzer.Tests/bin/Release/net8.0/Analyzer.Tests.dll" Completed="True" />
+  <Test Name="Factorio.Analyzers.Tests.RuleTests.DescriptorsAreDocumented" DisplayName="Factorio.Analyzers.Tests.RuleTests.DescriptorsAreDocumented" Source="/home/user/tests/Analyzer.Tests/bin/Release/net8.0/Analyzer.Tests.dll" Completed="False" />
+</TestSequence>

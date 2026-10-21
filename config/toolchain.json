@@ -1,0 +1,37 @@
+{
+  "$comment": "Pinned toolchain for factorio-csharp. `factorio-mod bootstrap` verifies these and records the result in build/toolchain.lock.json.",
+  "dotnet": {
+    "sdkVersion": "8.0.426",
+    "installChannel": "8.0",
+    "installDir": "/usr/share/dotnet",
+    "note": "Any .NET 8 SDK >= 8.0.4xx works; 8.0.426 is the version used for the recorded test run."
+  },
+  "cscharplua": {
+    "repository": "https://github.com/yanghuan/CSharp.lua.git",
+    "commit": "790d3cfb94a0656ce84b063f7dc72b0fc3106b4d",
+    "commitDate": "2026-09-22",
+    "launcherProject": "CSharp.lua.Launcher/CSharp.lua.Launcher.csproj",
+    "launcherDll": "CSharp.lua.Launcher/bin/Release/net8.0/CSharp.lua.Launcher.dll",
+    "patch": "tools/patches/cscharplua-net8.patch",
+    "note": "Upstream master targets an .NET preview SDK. tools/patches/cscharplua-net8.patch retargets only the launcher to net8.0; the compiler itself still targets netstandard2.1. No compiler logic is modified.",
+    "cloneDir": "vendor/CSharp.lua"
+  },
+  "lua": {
+    "interpreter": "lua5.2",
+    "version": "5.2.4",
+    "note": "Factorio uses a modified Lua 5.2. Local tests run under stock Lua 5.2.4 for syntax/semantic checks; this is NOT a substitute for the in-game integration test."
+  },
+  "factorio": {
+    "version": "2.0.72",
+    "apiVersion": 6,
+    "baseUrl": "https://lua-api.factorio.com/{version}/",
+    "runtimeJson": "runtime-api.json",
+    "prototypeJson": "prototype-api.json",
+    "factorioVersions": {
+      "2.0": "2.0.72",
+      "2.1": "2.1.22"
+    },
+    "defaultModVersion": "2.0",
+    "note": "`version` is the default: what `generate` writes when no version is named, and what a mod gets when its mod.json says nothing. `factorioVersions` maps the string a mod writes in mod.json to the API documentation version; each one gets its own api/<version>/ documents and Generated/<version>/ bindings. A mod declaring an older version loads in that version and every newer one, so 2.0 is the default for new mods."
+  }
+}

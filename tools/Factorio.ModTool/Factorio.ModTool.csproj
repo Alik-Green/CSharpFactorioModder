@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Factorio.ModTool</RootNamespace>
+    <AssemblyName>factorio-mod</AssemblyName>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The analyzers: shipped as a Roslyn component, and run in-process by `factorio-mod build`. -->
+    <ProjectReference Include="../Factorio.Analyzers/Factorio.Analyzers.csproj" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      The data-stage model (Factorio.Data): the types a mod's data/ sources derive from. It is a
+      normal .NET library, because a data stage written in C# is evaluated by this tool at build
+      time and emitted as Lua - it never runs inside Factorio, so it is not restricted to what
+      CSharp.lua can compile.
+    -->
+    <Compile Include="../../src/Factorio.Bindings/Data/**/*.cs" LinkBase="Data" />
+  </ItemGroup>
+
+</Project>

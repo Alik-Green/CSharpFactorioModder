@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "factorio-csharp",
+  "classifications": [
+    "Factorio",
+    "Game",
+    "Mod"
+  ],
+  "identity": "Factorio.Mod.CSharp.Template",
+  "groupIdentity": "Factorio.Mod",
+  "name": "Factorio mod (C#)",
+  "description": "A Factorio mod written in C#: the mod.json, a data stage (data/*.cs -> data.lua), a runtime stage (src/*.cs -> control.lua), and a .csproj whose Build button runs factorio-mod.",
+  "shortName": "factorio-mod",
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "sourceName": "FactorioMod",
+  "preferNameDirectory": true,
+  "symbols": {
+    "title": {
+      "type": "parameter",
+      "datatype": "text",
+      "replaces": "ModDisplayTitle",
+      "defaultValue": "Factorio Mod",
+      "description": "The name displayed in Factorio's mod list."
+    },
+    "modAuthor": {
+      "type": "parameter",
+      "datatype": "text",
+      "replaces": "ModAuthor",
+      "defaultValue": "unknown",
+      "description": "Shown in the mod list and in info.json."
+    },
+    "factorio": {
+      "type": "parameter",
+      "datatype": "choice",
+      "replaces": "ModFactorioVersion",
+      "defaultValue": "2.0",
+      "description": "The Factorio version the mod is built for. A 2.0 mod loads in 2.0 and newer.",
+      "choices": [
+        {
+          "choice": "2.0",
+          "description": "Loads in Factorio 2.0 and newer."
+        },
+        {
+          "choice": "2.1",
+          "description": "Factorio 2.1 only (new members available)."
+        }
+      ]
+    }
+  },
+  "sources": [
+    {
+      "modifiers": [
+        {
+          "exclude": [
+            ".template.config/**"
+          ]
+        }
+      ]
+    }
+  ]
+}

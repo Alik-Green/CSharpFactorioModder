@@ -1,0 +1,58 @@
+{
+  "sprites": [
+    {
+      "model": "gas-extractor.obj",
+      "output": "graphics/entity/gas-extractor",
+      "size": 128,
+      "views": [
+        0,
+        90,
+        180,
+        270
+      ],
+      "pitch": 45,
+      "zoom": 0.74,
+      "color": "#6E7A8A",
+      "lua": "lua/generated/gas-extractor-sprite.lua"
+    },
+    {
+      "model": "gas-extractor.obj",
+      "output": "graphics/icons/gas-extractor-render",
+      "size": 64,
+      "views": [
+        25
+      ],
+      "pitch": 50,
+      "zoom": 0.86,
+      "color": "#7C8AA0",
+      "lua": "lua/generated/gas-extractor-icon.lua"
+    },
+    {
+      "model": "gas-extractor.obj",
+      "output": "graphics/entity/gas-extractor-mk2",
+      "size": 128,
+      "views": [
+        0,
+        90,
+        180,
+        270
+      ],
+      "pitch": 45,
+      "zoom": 0.74,
+      "color": "#8A7A6E",
+      "lua": "lua/generated/gas-extractor-sprite-mk2.lua"
+    },
+    {
+      "model": "gas-extractor.obj",
+      "output": "graphics/icons/gas-extractor-mk2-render",
+      "size": 64,
+      "views": [
+        25
+      ],
+      "pitch": 50,
+      "zoom": 0.86,
+      "color": "#A08C7C",
+      "lua": "lua/generated/gas-extractor-icon-mk2.lua"
+    }
+  ]
+}

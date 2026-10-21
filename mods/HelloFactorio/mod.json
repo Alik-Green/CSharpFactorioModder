@@ -1,0 +1,25 @@
+{
+  "name": "HelloFactorio",
+  "title": "Hello Factorio (C#)",
+  "version": "0.2.0",
+  "author": "factorio-csharp",
+  "description": "End-to-end example: a Factorio mod written in C#, compiled to Lua by CSharp.lua, with generated API bindings.",
+  "factorioVersion": "2.0",
+  "dependencies": [
+    "base"
+  ],
+  "entry": "HelloFactorio.Main.Init",
+  "bindings": "runtime",
+  "sources": [
+    "src"
+  ],
+  "resources": [
+    "resources"
+  ],
+  "lua": [
+    "lua"
+  ],
+  "files": [
+    "thumbnail.png"
+  ]
+}

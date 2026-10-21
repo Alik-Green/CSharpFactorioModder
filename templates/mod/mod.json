@@ -1,0 +1,27 @@
+{
+  "name": "{{name}}",
+  "title": "{{title}}",
+  "version": "{{version}}",
+  "author": "{{author}}",
+  "description": "{{title}}: a Factorio mod written in C#, compiled to Lua by factorio-mod.",
+  "factorioVersion": "{{factorioVersion}}",
+  "dependencies": [
+    "base"
+  ],
+  "entry": "{{entry}}",
+  "dataEntry": "{{namespace}}.ExampleMod",
+  "bindings": "runtime",
+  "sources": [
+    "src"
+  ],
+  "dataSources": [
+    "data"
+  ],
+  "resources": [
+    "resources"
+  ],
+  "files": [
+    "thumbnail.png",
+    "changelog.txt"
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "name": "GasExtractor",
+  "title": "Gas Extractor (C#)",
+  "version": "0.5.0",
+  "author": "factorio-csharp",
+  "description": "A machine that pulls a chosen gas out of the air and into your pipes, and an upgraded tier unlocked by using the first one. Example of a Factorio mod written in C#: generated API bindings, rendered sprites, a prototype stage, and all runtime behaviour compiled by CSharp.lua.",
+  "factorioVersion": "2.0",
+  "dependencies": [
+    "base"
+  ],
+  "entry": "GasExtractor.Control.Init",
+  "bindings": "runtime",
+  "sources": [
+    "src"
+  ],
+  "resources": [
+    "resources"
+  ],
+  "lua": [
+    "lua"
+  ],
+  "files": [
+    "thumbnail.png"
+  ]
+}

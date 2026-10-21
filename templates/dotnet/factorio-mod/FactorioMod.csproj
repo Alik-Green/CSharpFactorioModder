@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Rider's Build button is this project's Build target.
+
+    The C# in src/ is not compiled by the .NET compiler: `factorio-mod build` transpiles it to
+    control.lua, and data/*.cs to data.lua. So Build does two things - compile nothing, then run the
+    tool, which builds the mod, checks it and writes build/mods/<name>_<version>.zip.
+
+    Where the tool is, in the order it is looked for:
+      1. -p:FactorioToolCommand="..." (or FactorioToolCommand in Directory.Build.props)
+      2. a checkout: $(FactorioRepo), or the two folders above this one, when it has
+         config/toolchain.json
+      3. `factorio-mod` on PATH, which is what the installer sets up
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+
+    <!-- Nothing is compiled: the work is the Exec below. -->
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <NoWarn>$(NoWarn);CS1591;CS2008</NoWarn>
+
+    <FactorioRepo Condition="'$(FactorioRepo)' == ''">$(FACTORIO_MOD_REPO)</FactorioRepo>
+    <FactorioRepo Condition="'$(FactorioRepo)' == ''">$(MSBuildThisFileDirectory)..\..</FactorioRepo>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <FactorioToolCommand Condition="'$(FactorioToolCommand)' == '' AND Exists('$(FactorioRepo)/config/toolchain.json') AND $([MSBuild]::IsOSPlatform('Windows'))">"$(FactorioRepo)\factorio-mod.cmd"</FactorioToolCommand>
+    <FactorioToolCommand Condition="'$(FactorioToolCommand)' == '' AND Exists('$(FactorioRepo)/config/toolchain.json') AND !$([MSBuild]::IsOSPlatform('Windows'))">dotnet "$(FactorioRepo)/tools/Factorio.ModTool/bin/Release/net8.0/factorio-mod.dll"</FactorioToolCommand>
+
+    <FactorioToolCommand Condition="'$(FactorioToolCommand)' == ''">factorio-mod</FactorioToolCommand>
+
+    <FactorioWorkingDirectory Condition="'$(FactorioWorkingDirectory)' == '' AND Exists('$(FactorioRepo)/config/toolchain.json')">$(FactorioRepo)</FactorioWorkingDirectory>
+    <FactorioWorkingDirectory Condition="'$(FactorioWorkingDirectory)' == ''">$(MSBuildProjectDirectory)</FactorioWorkingDirectory>
+  </PropertyGroup>
+
+  <Target Name="FactorioBuild" AfterTargets="Build" Condition="'$(DesignTimeBuild)' != 'true'">
+    <Message Importance="high" Text="factorio-mod build $(MSBuildProjectDirectory)" />
+    <Message Importance="normal" Condition="!Exists('$(FactorioRepo)/config/toolchain.json')"
+             Text="No checkout at $(FactorioRepo); using factorio-mod from PATH." />
+    <Exec Command="$(FactorioToolCommand) build &quot;$(MSBuildProjectDirectory)&quot; $(FactorioBuildArguments)"
+          WorkingDirectory="$(FactorioWorkingDirectory)" />
+  </Target>
+
+</Project>

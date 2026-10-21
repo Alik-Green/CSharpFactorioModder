@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Roslyn analyzers that reject C# which CSharp.lua cannot compile or Factorio cannot run.
+
+    The assembly is both:
+      * a normal analyzer package, usable from any csproj (<Analyzer Include="..." />), and
+      * a plain library: `factorio-mod build` runs the same analyzers in-process before it invokes
+        the compiler, so a mod without a csproj is checked too.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <AssemblyName>Factorio.Analyzers</AssemblyName>
+    <RootNamespace>Factorio.Analyzers</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Release tracking: RS2008 requires the shipped/unshipped files to be AdditionalFiles. -->
+    <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Private: the analyzer must run against whatever Roslyn the host has loaded. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,13 @@
+diff --git a/CSharp.lua.Launcher/CSharp.lua.Launcher.csproj b/CSharp.lua.Launcher/CSharp.lua.Launcher.csproj
+index 8a4c805..5fdb6c7 100644
+--- a/CSharp.lua.Launcher/CSharp.lua.Launcher.csproj
++++ b/CSharp.lua.Launcher/CSharp.lua.Launcher.csproj
+@@ -2,7 +2,7 @@
+ 
+   <PropertyGroup>
+     <OutputType>Exe</OutputType>
+-    <TargetFramework>net11.0</TargetFramework>
++    <TargetFramework>net8.0</TargetFramework>
+     <LangVersion>latest</LangVersion>
+   </PropertyGroup>
+ 

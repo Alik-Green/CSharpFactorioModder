@@ -1,0 +1,47 @@
+{
+  "note": "sha256 of every API document in api/\u003Cversion\u003E/, recorded by \u0060factorio-mod fetch-api\u0060.",
+  "versions": {
+    "2.0.72": {
+      "factorioVersion": "2.0.72",
+      "modVersion": "2.0",
+      "apiVersion": 6,
+      "source": "https://lua-api.factorio.com/2.0.72/",
+      "files": {
+        "runtime-api.json": {
+          "applicationVersion": "2.0.72",
+          "apiVersion": 6,
+          "sha256": "62e7e0c8bbb8d2f8c81b53ef77bde5a102dcc54d2f721526f3ada0eef7233226",
+          "bytes": 1849543
+        },
+        "prototype-api.json": {
+          "applicationVersion": "2.0.72",
+          "apiVersion": 6,
+          "sha256": "ee56a5e754c6cdfcb3729ef1a21c70bfc596c54454f82029c2459b7324e9f51c",
+          "bytes": 1723938
+        }
+      },
+      "fetchedAtUtc": "2026-10-20T20:48:50.5275393Z"
+    },
+    "2.1.22": {
+      "factorioVersion": "2.1.22",
+      "modVersion": "2.1",
+      "apiVersion": 6,
+      "source": "https://lua-api.factorio.com/2.1.22/",
+      "files": {
+        "runtime-api.json": {
+          "applicationVersion": "2.1.22",
+          "apiVersion": 6,
+          "sha256": "b13b3f44b88546dfeb74d360666f565f065bb1a801ee63bcc2069a5f05a30c68",
+          "bytes": 2132125
+        },
+        "prototype-api.json": {
+          "applicationVersion": "2.1.22",
+          "apiVersion": 6,
+          "sha256": "ed2f4c342841761ffd3cb46020b20c0b1672a6ad92e6e445e0824ba3b4ec7708",
+          "bytes": 1866301
+        }
+      },
+      "fetchedAtUtc": "2026-10-20T20:48:54.1213918Z"
+    }
+  }
+}

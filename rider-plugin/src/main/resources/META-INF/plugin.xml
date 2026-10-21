@@ -1,0 +1,67 @@
+<idea-plugin>
+  <id>com.factorio.csharp</id>
+  <name>Factorio C# Mods</name>
+  <version>1.0.0</version>
+  <vendor url="https://github.com/factorio-csharp">factorio-csharp</vendor>
+
+  <description><![CDATA[
+    Front end for <b>factorio-mod</b>, the toolchain that writes Factorio mods in C# and compiles
+    them to Lua.
+    <ul>
+      <li><b>New Factorio Mod…</b> (Tools menu): creates a mod project from the template -
+          <code>mod.json</code>, <code>src/</code>, <code>data/</code>, <code>resources/</code>, a
+          <code>.csproj</code> and a first build, so the zip is there before you write a line of
+          code.</li>
+      <li><b>Build Factorio Mod</b> (Tools menu, project view context menu): runs
+          <code>factorio-mod build</code> for the selected mods, in a console where the checker's
+          findings are clickable.</li>
+      <li>The generated <code>.csproj</code> means Rider's own <b>Build</b> button builds the mod:
+          the .NET project compiles nothing and runs the tool instead.</li>
+    </ul>
+    How a mod is built is read from its <code>mod.json</code> (<code>"build": { ... }</code>), so
+    there is nothing to configure per IDE.
+  ]]></description>
+
+  <!--
+    Only the platform is required: nothing here is Rider-specific, so the plugin loads in Rider,
+    IntelliJ IDEA and the other JetBrains IDEs, and it keeps loading when Rider's own APIs move.
+    242 = 2024.2, which is where the APIs used below settled.
+  -->
+  <depends>com.intellij.modules.platform</depends>
+  <idea-version since-build="242" />
+
+  <extensions defaultExtensionNs="com.intellij">
+    <!-- One balloon group for everything the plugin reports. -->
+    <notificationGroup id="FactorioMod" displayName="Factorio C# Mods" displayType="BALLOON" isLogByDefault="true"/>
+
+    <applicationConfigurable id="factorio.mod.settings"
+                            displayName="Factorio C# Mods"
+                            parentId="tools"
+                            instance="com.factorio.csharp.rider.FactorioConfigurable"/>
+  </extensions>
+
+  <actions>
+    <action id="Factorio.NewMod"
+            class="com.factorio.csharp.rider.NewModAction"
+            text="New Factorio Mod…"
+            description="Create a Factorio mod project from the C# template">
+      <add-to-group group-id="ToolsMenu" anchor="first"/>
+      <add-to-group group-id="NewGroup" anchor="last"/>
+    </action>
+
+    <action id="Factorio.BuildMod"
+            class="com.factorio.csharp.rider.BuildModAction"
+            text="Build Factorio Mod"
+            description="Run factorio-mod build for the selected mods and show what it reports">
+      <add-to-group group-id="ToolsMenu" anchor="after" relative-to-action="Factorio.NewMod"/>
+      <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+    </action>
+
+    <action id="Factorio.OpenSettings"
+            class="com.factorio.csharp.rider.OpenSettingsAction"
+            text="Factorio C# Mods Settings…"
+            description="Where the factorio-mod tool is">
+      <add-to-group group-id="ToolsMenu" anchor="last"/>
+    </action>
+  </actions>
+</idea-plugin>

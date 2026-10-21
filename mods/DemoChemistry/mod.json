@@ -1,0 +1,26 @@
+{
+  "name": "DemoChemistry",
+  "title": "Demo Chemistry (C# data stage)",
+  "version": "0.1.0",
+  "author": "factorio-csharp",
+  "description": "A small chemistry chain written entirely in C#: a coolant that is a recoloured water, a machine with its own rendered graphics, a resin and a pellet, and the recipes that make all of it obtainable in a normal game. The data stage is C# evaluated at build time and emitted as data.lua; the runtime stage is C# compiled to control.lua.",
+  "factorioVersion": "2.0",
+  "dependencies": [
+    "base"
+  ],
+  "entry": "DemoChemistry.Control.Init",
+  "dataEntry": "DemoChemistry.ExampleMod",
+  "bindings": "runtime",
+  "sources": [
+    "src"
+  ],
+  "dataSources": [
+    "data"
+  ],
+  "resources": [
+    "resources"
+  ],
+  "files": [
+    "CREDITS.md"
+  ]
+}

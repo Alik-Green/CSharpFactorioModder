@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json.schemastore.org/vs-2017.3.host",
+  "name": "Factorio mod (C#)",
+  "icon": "icon.png",
+  "symbolInfo": [
+    {
+      "id": "title",
+      "name": "Display name",
+      "isVisible": true
+    },
+    {
+      "id": "modAuthor",
+      "name": "Author",
+      "isVisible": true
+    },
+    {
+      "id": "factorio",
+      "name": "Factorio version",
+      "isVisible": true
+    }
+  ]
+}

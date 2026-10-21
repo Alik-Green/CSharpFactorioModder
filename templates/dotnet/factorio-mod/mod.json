@@ -1,0 +1,33 @@
+{
+  "name": "FactorioMod",
+  "title": "ModDisplayTitle",
+  "version": "0.1.0",
+  "author": "ModAuthor",
+  "description": "ModDisplayTitle: a Factorio mod written in C#, compiled to Lua by factorio-mod.",
+  "factorioVersion": "ModFactorioVersion",
+  "dependencies": [
+    "base"
+  ],
+  "entry": "FactorioMod.Main.Init",
+  "dataEntry": "FactorioMod.ExampleMod",
+  "bindings": "runtime",
+  "sources": [
+    "src"
+  ],
+  "dataSources": [
+    "data"
+  ],
+  "resources": [
+    "resources"
+  ],
+  "files": [
+    "changelog.txt"
+  ],
+  "build": {
+    "zip": true,
+    "analyze": true,
+    "assets": true,
+    "validate": true,
+    "format": "text"
+  }
+}
