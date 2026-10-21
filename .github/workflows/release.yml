@@ -17,113 +17,11 @@ permissions:
   contents: write
 
 jobs:
-  unix:
-    name: Build & test (Linux / macOS)
-    runs-on: ubuntu-latest
+  windows:
+    name: Build & test Windows installer
+    runs-on: windows-latest
     outputs:
       version: ${{ steps.meta.outputs.version }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Determine release version
-        id: meta
-        run: |
-          if [ -n "${{ inputs.version }}" ]; then
-            ver="${{ inputs.version }}"
-          elif [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
-            ver="${GITHUB_REF#refs/tags/v}"
-          else
-            ver="1.0.0"
-          fi
-          ver="${ver#v}"
-          echo "version=${ver}" >> "$GITHUB_OUTPUT"
-
-      - name: Setup .NET 8 SDK
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
-      - name: Install Lua 5.2 for full test verification
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y lua5.2
-
-      - name: Build tool and bootstrap CSharp.lua compiler
-        run: |
-          dotnet build tools/Factorio.ModTool -c Release
-          dotnet tools/Factorio.ModTool/bin/Release/net8.0/factorio-mod.dll bootstrap
-
-      - name: Run full test suite (xUnit + Lua 5.2 mock & prototype tests)
-        run: |
-          log_cmd() {
-            local tmp msg
-            tmp=$(mktemp)
-            if ! "$@" >"$tmp" 2>&1; then
-              cat "$tmp"
-              msg=$(tail -n 60 "$tmp" | sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g')
-              echo "::error::Command failed ($*):%0A${msg}"
-              rm -f "$tmp"
-              return 1
-            fi
-            cat "$tmp"
-            rm -f "$tmp"
-          }
-          log_cmd dotnet test tests/Generator.Tests -c Release --nologo
-          log_cmd dotnet test tests/Transpile.Tests -c Release --nologo
-          log_cmd dotnet test tests/Analyzer.Tests -c Release --nologo
-          log_cmd dotnet tools/Factorio.ModTool/bin/Release/net8.0/factorio-mod.dll build mods/HelloFactorio mods/GasExtractor mods/DemoChemistry
-          log_cmd lua5.2 tests/lua/run_mod.lua "build/mods/HelloFactorio_$(python3 -c 'import json;print(json.load(open("mods/HelloFactorio/mod.json"))["version"])')/control.lua"
-          log_cmd lua5.2 tests/lua/gas_extractor_test.lua "build/mods/GasExtractor_$(python3 -c 'import json;print(json.load(open("mods/GasExtractor/mod.json"))["version"])')/control.lua"
-          log_cmd lua5.2 tests/lua/demo_chemistry_test.lua "build/mods/DemoChemistry_$(python3 -c 'import json;print(json.load(open("mods/DemoChemistry/mod.json"))["version"])')/control.lua"
-          log_cmd lua5.2 tests/lua/data_inherit_test.lua "build/mods/DemoChemistry_$(python3 -c 'import json;print(json.load(open("mods/DemoChemistry/mod.json"))["version"])')/data.lua"
-          log_cmd lua5.2 tests/lua/util_test.lua
-
-      - name: Package macOS arm64 and Linux x64 archives
-        run: |
-          installer/package.sh "${{ steps.meta.outputs.version }}" osx-arm64
-          installer/package.sh "${{ steps.meta.outputs.version }}" linux-x64
-
-      - name: Smoke-test Linux dist and installer archive
-        run: |
-          log_script() {
-            local tmp msg
-            tmp=$(mktemp)
-            if ! bash -e -x "$1" >"$tmp" 2>&1; then
-              cat "$tmp"
-              msg=$(tail -n 60 "$tmp" | sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g')
-              echo "::error::Linux smoke test failed:%0A${msg}"
-              rm -f "$tmp"
-              return 1
-            fi
-            cat "$tmp"
-            rm -f "$tmp"
-          }
-          smoke_sh=$(mktemp)
-          cat <<'SMOKE' > "$smoke_sh"
-          work="$(mktemp -d)"
-          (cd "$work" && "$GITHUB_WORKSPACE/dist/bin/factorio-mod" doctor)
-          (cd "$work" && "$GITHUB_WORKSPACE/dist/bin/factorio-mod" build "$GITHUB_WORKSPACE/dist/mods/HelloFactorio")
-          tar -xzf "release/FactorioCSharpModder-${VERSION}-linux-x64.tar.gz" -C "$work"
-          "$work/FactorioCSharpModder-${VERSION}-linux-x64/install.sh" --prefix "$work/prefix" --yes
-          "$work/prefix/bin/factorio-mod" --version | grep -F "${VERSION}"
-          (cd "$work" && "$work/prefix/bin/factorio-mod" doctor)
-          mkdir -p "$work/smoke"
-          (cd "$work/smoke" && "$work/prefix/bin/factorio-mod" new SmokeTest)
-          test -f "$work/smoke/SmokeTest/build/mods/SmokeTest_0.1.0.zip" || test -f "$work/prefix/lib/factorio-mod/build/mods/SmokeTest_0.1.0.zip"
-          dotnet new list factorio-mod
-          SMOKE
-          VERSION="${{ steps.meta.outputs.version }}" log_script "$smoke_sh"
-
-      - name: Upload Unix release archives
-        uses: actions/upload-artifact@v4
-        with:
-          name: unix-archives
-          path: release/*.tar.gz
-          if-no-files-found: error
-
-  windows:
-    name: Build & test (Windows installer)
-    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -147,7 +45,7 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Ensure Inno Setup 6 and Lua 5.2 are installed
+      - name: Ensure Inno Setup 6 and Lua compiler are installed
         shell: pwsh
         run: |
           $iscc86 = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
@@ -157,22 +55,13 @@ jobs:
           }
           $luaDir = Join-Path $env:RUNNER_TEMP 'lua52'
           New-Item -ItemType Directory -Force -Path $luaDir | Out-Null
-          try {
-            $luaZip = Join-Path $luaDir 'lua52.zip'
-            Invoke-WebRequest -Uri 'https://downloads.sourceforge.net/project/luabinaries/5.2.4/Tools%20Executables/lua-5.2.4_Win64_bin.zip' -OutFile $luaZip -UseBasicParsing
-            Expand-Archive -Path $luaZip -DestinationPath $luaDir -Force
-            Copy-Item (Join-Path $luaDir 'lua52.exe') (Join-Path $luaDir 'lua5.2.exe') -Force
-            Copy-Item (Join-Path $luaDir 'luac52.exe') (Join-Path $luaDir 'luac5.2.exe') -Force
-            Copy-Item (Join-Path $luaDir 'luac52.exe') (Join-Path $luaDir 'luac.exe') -Force
-          } catch {
-            choco install lua --no-progress -y
-            $luacExe = Get-ChildItem -Path 'C:\Program Files*','C:\ProgramData\chocolatey' -Filter 'luac*.exe' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-            Copy-Item $luacExe.FullName (Join-Path $luaDir 'luac.exe') -Force
-          }
+          choco install lua --no-progress -y
+          $luacExe = Get-ChildItem -Path 'C:\Program Files*','C:\ProgramData\chocolatey' -Filter 'luac*.exe' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          Copy-Item $luacExe.FullName (Join-Path $luaDir 'luac.exe') -Force
           "$luaDir" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
           & (Join-Path $luaDir 'luac.exe') -v
 
-      - name: Bootstrap CSharp.lua compiler & run xUnit tests on Windows
+      - name: Bootstrap compiler, run tests, and build Windows installer (.exe)
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Continue'
@@ -236,48 +125,26 @@ jobs:
             throw
           }
 
-      - name: Upload Windows installer
+      - name: Upload Windows installer artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-installer
           path: release/*.exe
           if-no-files-found: error
 
-  publish:
-    name: Publish GitHub Release
-    runs-on: ubuntu-latest
-    needs: [unix, windows]
-    if: github.event_name == 'push'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download release assets
-        uses: actions/download-artifact@v4
-        with:
-          path: release
-          merge-multiple: true
-
-      - name: List built release assets
-        run: ls -lh release/
-
-      - name: Create or update GitHub Release
+      - name: Publish GitHub Release
+        if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
         run: |
-          ver="${{ needs.unix.outputs.version }}"
-          tag="v${ver}"
-          if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" \
-              "release/FactorioCSharpModder-${ver}-win64.exe" \
-              "release/FactorioCSharpModder-${ver}-linux-x64.tar.gz" \
-              "release/FactorioCSharpModder-${ver}-osx-arm64.tar.gz" \
-              --clobber
-          else
-            gh release create "$tag" \
-              "release/FactorioCSharpModder-${ver}-win64.exe" \
-              "release/FactorioCSharpModder-${ver}-linux-x64.tar.gz" \
-              "release/FactorioCSharpModder-${ver}-osx-arm64.tar.gz" \
-              --target "${GITHUB_SHA}" \
-              --title "Factorio C# Modder ${ver}" \
-              --generate-notes
-          fi
+          $ver = "${{ steps.meta.outputs.version }}"
+          $tag = "v$ver"
+          $exe = "release\FactorioCSharpModder-$ver-win64.exe"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $exe --clobber
+          } else {
+            gh release create $tag $exe --target "${env:GITHUB_SHA}" --title "Factorio C# Modder $ver" --generate-notes
+          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

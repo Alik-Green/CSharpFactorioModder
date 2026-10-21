@@ -35,7 +35,7 @@
 #define AppUrl "https://github.com/Alik-Green/CSharpFactorioModder"
 
 ; The payload is the thing that gets installed; fail here rather than shipping an empty installer.
-#ifnexists PayloadDir + "\VERSION"
+#if !FileExists(PayloadDir + "\VERSION") && !FileExists(AddBackslash(SourcePath) + PayloadDir + "\VERSION")
   #error The payload folder is missing. Run `factorio-mod dist --output dist --runtime win-x64` first, or pass /DPayloadDir=<folder>.
 #endif
 
@@ -106,6 +106,22 @@ Type: filesandordirs; Name: "{app}\build"
 
 [Code]
 
+{ Whether a specific switch was passed on the Setup command line. }
+function CmdLineParamExists(const Value: string): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 1 to ParamCount do
+  begin
+    if CompareText(ParamStr(I), Value) = 0 then
+    begin
+      Result := True;
+      exit;
+    end;
+  end;
+end;
+
 { Whether `dotnet` can be run at all. Called once, because it starts a process. }
 function HasDotnet(): Boolean;
 var
@@ -123,9 +139,11 @@ end;
 { Whether PATH already contains the folder, so installing twice does not add it twice. }
 function NeedsAddPath(Param: string): Boolean;
 var
+  Root: Integer;
   Path: string;
 begin
-  if not RegQueryStringValue(HKA, 'Environment', 'Path', Path) then
+  if IsAdminInstallMode then Root := HKLM else Root := HKCU;
+  if not RegQueryStringValue(Root, 'Environment', 'Path', Path) then
   begin
     Result := True;
     exit;
@@ -137,35 +155,37 @@ end;
 { Removes one entry from PATH on uninstall, keeping everything else. }
 procedure RemoveFromPath(Entry: string);
 var
-  Root: Integer;
-  Path, Updated: string;
-  Pieces: TStringList;
-  I: Integer;
+  Root, P: Integer;
+  Path, Rest, Piece, Updated: string;
 begin
   if IsAdminInstallMode then Root := HKLM else Root := HKCU;
   if not RegQueryStringValue(Root, 'Environment', 'Path', Path) then exit;
 
-  Pieces := TStringList.Create;
-  try
-    Pieces.Delimiter := ';';
-    Pieces.StrictDelimiter := True;
-    Pieces.DelimitedText := Path;
-
-    Updated := '';
-    for I := 0 to Pieces.Count - 1 do
+  Rest := Path;
+  Updated := '';
+  while Rest <> '' do
+  begin
+    P := Pos(';', Rest);
+    if P > 0 then
     begin
-      if (Pieces[I] <> '') and (CompareText(Trim(Pieces[I]), Entry) <> 0) then
-      begin
-        if Updated <> '' then Updated := Updated + ';';
-        Updated := Updated + Pieces[I];
-      end;
+      Piece := Copy(Rest, 1, P - 1);
+      Delete(Rest, 1, P);
+    end
+    else
+    begin
+      Piece := Rest;
+      Rest := '';
     end;
 
-    if Updated <> Path then
-      RegWriteExpandStringValue(Root, 'Environment', 'Path', Updated);
-  finally
-    Pieces.Free;
+    if (Trim(Piece) <> '') and (CompareText(Trim(Piece), Entry) <> 0) then
+    begin
+      if Updated <> '' then Updated := Updated + ';';
+      Updated := Updated + Piece;
+    end;
   end;
+
+  if Updated <> Path then
+    RegWriteExpandStringValue(Root, 'Environment', 'Path', Updated);
 end;
 
 { Runs `factorio-mod template` in the installation, which installs the "Factorio mod (C#)"
@@ -173,12 +193,11 @@ end;
 procedure InstallTemplate();
 var
   ResultCode: Integer;
-  Command: string;
 begin
-  WizardForm.StatusLabel.Caption := 'Installing the Factorio mod template...';
-  Command := '/C ""' + ExpandConstant('{app}\bin\factorio-mod.exe') + '" template"';
+  if WizardForm <> nil then
+    WizardForm.StatusLabel.Caption := 'Installing the Factorio mod template...';
 
-  if not Exec(ExpandConstant('{cmd}'), Command, ExpandConstant('{app}'),
+  if not Exec(ExpandConstant('{app}\bin\factorio-mod.exe'), 'template', ExpandConstant('{app}'),
               SW_HIDE, ewWaitUntilTerminated, ResultCode) or (ResultCode <> 0) then
   begin
     MsgBox('The project template could not be installed (exit code ' + IntToStr(ResultCode) + ').' + #13#10 + #13#10 +
@@ -214,8 +233,8 @@ procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
   begin
-    // A silent install must not stop on a dialog. /TEMPLATE opts in without asking, so a script can
-    // still get the template; without it, silent means "files only".
+    { A silent install must not stop on a dialog. /TEMPLATE opts in without asking, so a script can
+      still get the template; without it, silent means "files only". }
     if CmdLineParamExists('/NOTEMPLATE') then
       exit
     else if CmdLineParamExists('/TEMPLATE') then
@@ -228,7 +247,6 @@ end;
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   ResultCode: Integer;
-  Command: string;
 begin
   if CurUninstallStep = usUninstall then
   begin
@@ -236,8 +254,8 @@ begin
       because dotnet disappeared since the install. }
     if HasDotnet() then
     begin
-      Command := '/C ""dotnet" new uninstall "' + ExpandConstant('{app}\templates\dotnet\factorio-mod') + '" >nul 2>&1"';
-      Exec(ExpandConstant('{cmd}'), Command, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+      Exec('dotnet', 'new uninstall "' + ExpandConstant('{app}\templates\dotnet\factorio-mod') + '"',
+           '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     end;
 
     RemoveFromPath(ExpandConstant('{app}\bin'));
