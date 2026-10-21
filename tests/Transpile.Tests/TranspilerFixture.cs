@@ -121,7 +121,7 @@ public static class LuaChecks
     /// <summary>Parse a file with a real Lua 5.2 compiler; this is the authoritative syntax check.</summary>
     public static (bool ok, string message) ParseLua52(string path)
     {
-        foreach (var exe in new[] { "luac5.2", "luac" })
+        foreach (var exe in new[] { "luac5.2", "luac52", "luac54", "luac" })
         {
             var psi = new ProcessStartInfo(exe) { RedirectStandardError = true, RedirectStandardOutput = true };
             psi.ArgumentList.Add("-p");

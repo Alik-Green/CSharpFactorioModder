@@ -147,7 +147,7 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Ensure Inno Setup 6 and Lua compiler are installed
+      - name: Ensure Inno Setup 6 and Lua 5.2 are installed
         shell: pwsh
         run: |
           $iscc86 = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
@@ -155,9 +155,22 @@ jobs:
           if (-not (Test-Path $iscc86) -and -not (Test-Path $iscc64)) {
             choco install innosetup --no-progress -y
           }
-          if (-not (Get-Command luac -ErrorAction SilentlyContinue) -and -not (Get-Command luac52 -ErrorAction SilentlyContinue)) {
+          $luaDir = Join-Path $env:RUNNER_TEMP 'lua52'
+          New-Item -ItemType Directory -Force -Path $luaDir | Out-Null
+          try {
+            $luaZip = Join-Path $luaDir 'lua52.zip'
+            Invoke-WebRequest -Uri 'https://downloads.sourceforge.net/project/luabinaries/5.2.4/Tools%20Executables/lua-5.2.4_Win64_bin.zip' -OutFile $luaZip -UseBasicParsing
+            Expand-Archive -Path $luaZip -DestinationPath $luaDir -Force
+            Copy-Item (Join-Path $luaDir 'lua52.exe') (Join-Path $luaDir 'lua5.2.exe') -Force
+            Copy-Item (Join-Path $luaDir 'luac52.exe') (Join-Path $luaDir 'luac5.2.exe') -Force
+            Copy-Item (Join-Path $luaDir 'luac52.exe') (Join-Path $luaDir 'luac.exe') -Force
+          } catch {
             choco install lua --no-progress -y
+            $luacExe = Get-ChildItem -Path 'C:\Program Files*','C:\ProgramData\chocolatey' -Filter 'luac*.exe' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            Copy-Item $luacExe.FullName (Join-Path $luaDir 'luac.exe') -Force
           }
+          "$luaDir" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          & (Join-Path $luaDir 'luac.exe') -v
 
       - name: Bootstrap CSharp.lua compiler & run xUnit tests on Windows
         shell: pwsh
