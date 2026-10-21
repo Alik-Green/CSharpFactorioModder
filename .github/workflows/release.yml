@@ -56,7 +56,7 @@ jobs:
           $luaDir = Join-Path $env:RUNNER_TEMP 'lua52'
           New-Item -ItemType Directory -Force -Path $luaDir | Out-Null
           choco install lua --no-progress -y
-          $luacExe = Get-ChildItem -Path 'C:\Program Files*','C:\ProgramData\chocolatey' -Filter 'luac*.exe' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          $luacExe = Get-ChildItem -Path 'C:\ProgramData\chocolatey','C:\Program Files (x86)\Lua','C:\Program Files\Lua' -Filter 'luac*.exe' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
           Copy-Item $luacExe.FullName (Join-Path $luaDir 'luac.exe') -Force
           "$luaDir" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
           & (Join-Path $luaDir 'luac.exe') -v
