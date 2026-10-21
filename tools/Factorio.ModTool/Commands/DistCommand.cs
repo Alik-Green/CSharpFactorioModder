@@ -46,7 +46,7 @@ public static class DistCommand
         if (Directory.Exists(output))
         {
             // Only what this command writes, so a stale build/obj from a previous run cannot leak in.
-            foreach (var name in new[] { "bin", "api", "config", "src", "vendor", "templates", "tools", "mods", "docs", "plugin" })
+            foreach (var name in new[] { "bin", "lib", "api", "config", "src", "vendor", "templates", "tools", "mods", "docs", "plugin" })
             {
                 var path = Path.Combine(output, name);
                 if (Directory.Exists(path)) Directory.Delete(path, true);
@@ -87,7 +87,11 @@ public static class DistCommand
             foreach (var zip in Directory.EnumerateFiles(plugin, "*.zip")) CopyFile(zip, Path.Combine(target, Path.GetFileName(zip)));
         }
 
-        if (publish) Publish(settings, output, runtime, version);
+        if (publish)
+        {
+            Publish(settings, output, runtime, version);
+            PublishBindings(settings, output);
+        }
         WriteLauncher(output, runtime);
         File.WriteAllText(Path.Combine(output, "VERSION"), version + "\n");
 
@@ -187,6 +191,39 @@ public static class DistCommand
         // Publish output includes symbol caches the tool does not read.
         foreach (var stale in Directory.EnumerateFiles(bin, "*.pdb")) File.Delete(stale);
         Console.WriteLine($"bin        {new DirectoryInfo(bin).EnumerateFiles().Count()} file(s)");
+    }
+
+    /// <summary>Builds <c>lib/Factorio.Bindings.dll</c> + XML docs for instant IDE IntelliSense and compilation.</summary>
+    private static void PublishBindings(ToolchainSettings settings, string output)
+    {
+        var project = Path.Combine(settings.Root, "src", "Factorio.Bindings", "Factorio.Bindings.csproj");
+        var lib = Path.Combine(output, "lib");
+
+        var start = new ProcessStartInfo(settings.DotnetPath);
+        foreach (var argument in new[]
+                 {
+                     "build", project,
+                     "-c", "Release",
+                     "-o", lib,
+                     "--nologo",
+                 })
+            start.ArgumentList.Add(argument);
+
+        start.RedirectStandardOutput = true;
+        start.RedirectStandardError = true;
+        start.UseShellExecute = false;
+
+        Console.WriteLine("publish    Factorio.Bindings for IDE & MSBuild");
+        using var process = Process.Start(start) ?? throw new ToolException("cannot run " + settings.DotnetPath);
+        var stdout = process.StandardOutput.ReadToEnd();
+        var stderr = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+
+        if (process.ExitCode != 0)
+            throw new ToolException("dotnet build Factorio.Bindings failed:\n" + Tail(stdout + "\n" + stderr, 25));
+
+        foreach (var stale in Directory.EnumerateFiles(lib, "*.pdb")) File.Delete(stale);
+        Console.WriteLine($"lib        {new DirectoryInfo(lib).EnumerateFiles().Count()} file(s)");
     }
 
     /// <summary>

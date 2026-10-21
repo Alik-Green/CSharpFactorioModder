@@ -90,6 +90,10 @@ Source: "{#PayloadDir}\*"; DestDir: "{app}"; Excludes: "build\*,build\*.*"; \
 
 [Registry]
 ; HKA is HKLM for an all-users install and HKCU for a per-user one, decided by the first page.
+Root: HKA; Subkey: "Software\FactorioCSharpModder"; ValueType: string; ValueName: "InstallDir"; ValueData: "{app}"; \
+    Flags: uninsdeletekey
+Root: HKA; Subkey: "Environment"; ValueType: string; ValueName: "FACTORIO_MOD_HOME"; ValueData: "{app}"; \
+    Flags: uninsdeletevalue
 Root: HKA; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}\bin"; \
     Tasks: addtopath; Check: NeedsAddPath(ExpandConstant('{app}\bin'))
 
