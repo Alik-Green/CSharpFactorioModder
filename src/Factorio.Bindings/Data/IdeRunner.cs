@@ -91,7 +91,8 @@ namespace Factorio
             }
 
             var factorioExe = ResolveFactorioExecutable();
-            var launch = args.Any(a => string.Equals(a, "--launch", StringComparison.OrdinalIgnoreCase)) ||
+            var launch = args.Any(a => string.Equals(a, "--launch", StringComparison.OrdinalIgnoreCase) ||
+                                       string.Equals(a, "launch", StringComparison.OrdinalIgnoreCase)) ||
                          string.Equals(Environment.GetEnvironmentVariable("FACTORIO_LAUNCH"), "1", StringComparison.Ordinal);
 
             if (launch)

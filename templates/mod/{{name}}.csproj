@@ -9,7 +9,7 @@
     * Build (Ctrl+Shift+B / Ctrl+F9) compiles C#, validates Roslyn & prototype rules, and packages
       build/mods/<name>_<version>.zip.
     * Run (F5 / Shift+F10) builds the mod and copies the zip straight into Factorio's mods folder
-      (pass `--launch` in Program Arguments to also launch Factorio).
+      (pass `launch` / set FACTORIO_LAUNCH=1 to also launch Factorio).
   -->
 
   <PropertyGroup>
