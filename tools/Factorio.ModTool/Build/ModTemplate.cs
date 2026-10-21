@@ -26,8 +26,9 @@ public static class ModTemplate
     }
 
     /// <summary>Derives a PascalCase C# namespace identifier from a Factorio mod name.</summary>
-    public static string NamespaceFor(string name)
+    public static string NamespaceFor(string? name)
     {
+        if (string.IsNullOrEmpty(name)) return "Mod";
         var sb = new StringBuilder(name.Length);
         var upperNext = true;
         foreach (var ch in name)

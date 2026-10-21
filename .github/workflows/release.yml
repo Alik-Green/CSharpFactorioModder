@@ -54,7 +54,25 @@ jobs:
           dotnet tools/Factorio.ModTool/bin/Release/net8.0/factorio-mod.dll bootstrap
 
       - name: Run full test suite (xUnit + Lua 5.2 mock & prototype tests)
-        run: make test
+        run: |
+          log_cmd() {
+            local tmp
+            tmp=$(mktemp)
+            if ! "$@" >"$tmp" 2>&1; then
+              cat "$tmp"
+              tail -n 60 "$tmp" | while IFS= read -r l; do
+                [ -n "$l" ] && echo "::error::$l"
+              done
+              rm -f "$tmp"
+              return 1
+            fi
+            cat "$tmp"
+            rm -f "$tmp"
+          }
+          log_cmd dotnet test tests/Generator.Tests -c Release --nologo
+          log_cmd dotnet test tests/Transpile.Tests -c Release --nologo
+          log_cmd dotnet test tests/Analyzer.Tests -c Release --nologo
+          log_cmd make test
 
       - name: Package macOS arm64 and Linux x64 archives
         run: |
@@ -63,17 +81,35 @@ jobs:
 
       - name: Smoke-test Linux dist and installer archive
         run: |
+          log_script() {
+            local tmp
+            tmp=$(mktemp)
+            if ! bash -e -x "$1" >"$tmp" 2>&1; then
+              cat "$tmp"
+              tail -n 50 "$tmp" | while IFS= read -r l; do
+                [ -n "$l" ] && echo "::error::$l"
+              done
+              rm -f "$tmp"
+              return 1
+            fi
+            cat "$tmp"
+            rm -f "$tmp"
+          }
+          smoke_sh=$(mktemp)
+          cat <<'SMOKE' > "$smoke_sh"
           ./dist/bin/factorio-mod doctor
           ./dist/bin/factorio-mod build dist/mods/HelloFactorio
           work="$(mktemp -d)"
-          tar -xzf "release/FactorioCSharpModder-${{ steps.meta.outputs.version }}-linux-x64.tar.gz" -C "$work"
-          "$work/FactorioCSharpModder-${{ steps.meta.outputs.version }}-linux-x64/install.sh" --prefix "$work/prefix" --yes
-          "$work/prefix/bin/factorio-mod" --version | grep -F "${{ steps.meta.outputs.version }}"
+          tar -xzf "release/FactorioCSharpModder-${VERSION}-linux-x64.tar.gz" -C "$work"
+          "$work/FactorioCSharpModder-${VERSION}-linux-x64/install.sh" --prefix "$work/prefix" --yes
+          "$work/prefix/bin/factorio-mod" --version | grep -F "${VERSION}"
           "$work/prefix/bin/factorio-mod" doctor
           mkdir -p "$work/smoke"
           (cd "$work/smoke" && "$work/prefix/bin/factorio-mod" new SmokeTest)
           test -f "$work/smoke/SmokeTest/build/mods/SmokeTest_0.1.0.zip" || test -f "$work/prefix/lib/factorio-mod/build/mods/SmokeTest_0.1.0.zip"
           dotnet new list factorio-mod
+          SMOKE
+          VERSION="${{ steps.meta.outputs.version }}" log_script "$smoke_sh"
 
       - name: Upload Unix release archives
         uses: actions/upload-artifact@v4
