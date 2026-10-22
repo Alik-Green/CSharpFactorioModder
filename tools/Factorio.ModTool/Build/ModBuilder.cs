@@ -104,7 +104,7 @@ public static class ModBuilder
                 project.DataSourceFiles(),
                 target.ModVersion,
                 project.Name,
-                new[] { Path.Combine(project.Directory, "resources") });
+                project.Resources.Select(r => Path.Combine(project.ProjectDirectory, r)).ToArray());
             generatedDataLua = dataResult.Lua;
             inheritedPrototypes = dataResult.Inherited;
 
