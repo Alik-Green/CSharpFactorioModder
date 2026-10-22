@@ -290,10 +290,11 @@ public static class Shell
         try
         {
             using var p = Process.Start(psi) ?? throw new ToolException("failed to start " + fileName);
-            var stdout = p.StandardOutput.ReadToEnd();
-            var stderr = p.StandardError.ReadToEnd();
+            var stdoutTask = p.StandardOutput.ReadToEndAsync();
+            var stderrTask = p.StandardError.ReadToEndAsync();
             p.WaitForExit();
-            return new RunResult(p.ExitCode, stdout, stderr);
+            Task.WaitAll(stdoutTask, stderrTask);
+            return new RunResult(p.ExitCode, stdoutTask.Result, stderrTask.Result);
         }
         catch (System.ComponentModel.Win32Exception e)
         {

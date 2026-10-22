@@ -105,11 +105,12 @@ public sealed class TranspilerFixture : IDisposable
         psi.ArgumentList.Add("@" + rsp);
 
         using var p = Process.Start(psi)!;
-        var stdout = p.StandardOutput.ReadToEnd();
-        var stderr = p.StandardError.ReadToEnd();
+        var stdoutTask = p.StandardOutput.ReadToEndAsync();
+        var stderrTask = p.StandardError.ReadToEndAsync();
         p.WaitForExit();
+        Task.WaitAll(stdoutTask, stderrTask);
         var files = Directory.GetFiles(outDir, "*.lua").Select(Path.GetFileName).OrderBy(x => x).ToList();
-        return new TranspileResult(p.ExitCode, stdout, stderr, outDir, files!);
+        return new TranspileResult(p.ExitCode, stdoutTask.Result, stderrTask.Result, outDir, files!);
     }
 
     public void Dispose()
