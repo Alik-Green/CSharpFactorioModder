@@ -1,20 +1,58 @@
 using System;
+using System.Linq;
 
 namespace Factorio.Data
 {
     /// <summary>
-    /// One picture: the <c>filename</c>, its pixel size, and how big it is drawn in-game.
+    /// Controls how <see cref="Sprite.Auto(string, double, double, double, SpriteAlign)"/> and
+    /// <see cref="GraphicsSet.Auto(string, double, double, double, SpriteAlign)"/> scale and align
+    /// a PNG image inside an entity's grid hitbox.
+    /// </summary>
+    public enum SpriteAlign
+    {
+        /// <summary>
+        /// <b>Default (Factorio 45° building standard):</b> Automatically trims transparent borders in
+        /// the PNG, centers visible pixels horizontally on the grid, scales width to match the tile
+        /// footprint cleanly, and anchors tall buildings' bases flush with the bottom of the tile box
+        /// so roofs/chimneys extend upward (<c>-Y</c>) naturally just like vanilla Factorio machines!
+        /// </summary>
+        Footprint = 0,
+
+        /// <summary>
+        /// Trims transparent borders in the PNG, fits the entire visible sprite inside the
+        /// <c>tilesWide × tilesHigh</c> box, and centers both X and Y on <c>(0, 0)</c>.
+        /// </summary>
+        Center = 1,
+
+        /// <summary>
+        /// Trims transparent borders in the PNG, fits inside <c>tilesWide × tilesHigh</c>, centers X on
+        /// <c>0</c>, and places the visible bottom edge flush on the bottom of the selection box.
+        /// </summary>
+        Bottom = 2,
+
+        /// <summary>
+        /// Uses the raw full PNG canvas dimensions with zero alpha-channel border trimming (for sprites
+        /// that already baked exact Factorio canvas offsets).
+        /// </summary>
+        Canvas = 3,
+    }
+
+    /// <summary>
+    /// One picture: the <c>filename</c>, its pixel size, scale, and world/grid alignment offset.
     /// <para>
-    /// In Factorio, <b>1 tile = 32 pixels</b>:
+    /// In Factorio, <b>1 tile = 32 pixels</b>, <c>+X</c> moves East (right), <c>-Y</c> moves North (up),
+    /// and <c>+Y</c> moves South (down):
     /// </para>
-    /// <list type="bullet">
-    /// <item><description>Use <see cref="Auto(string, double)"/> or <see cref="Auto(string, double, double)"/> to read the PNG's real dimensions automatically and scale it to fit a machine's tile footprint (e.g. <c>Sprite.Auto(Asset.Mod("graphics/entity/machine.png"), tiles: 3)</c>).</description></item>
-    /// <item><description>Even if you use <see cref="Scaled"/> or <see cref="File"/>, if the PNG inside <c>resources/</c> is smaller than the crop rectangle you passed, the build automatically fits to the PNG's actual pixel dimensions so Factorio never fails with <em>sprite rectangle is outside the actual sprite size</em>.</description></item>
-    /// </list>
+    /// <code>
+    /// // Auto-trims transparent PNG margins, fits your grid footprint, &amp; allows fine nudging:
+    /// Graphics = GraphicsSet.Auto(Asset.Mod("graphics/entity/machine.png"), tiles: 3)
+    ///     .Shift(0, -0.25)       // nudge in tiles (or use .ShiftPixels(0, -8)!)
+    ///     .ScaleBy(1.1);         // optional artistic scale tweak while keeping alignment!
+    /// </code>
     /// </summary>
     public sealed class Sprite : ILuaValue
     {
-        /// <summary>Pixels per world tile in Factorio's standard resolution coordinate space.</summary>
+        /// <summary>Pixels per world tile in Factorio's standard coordinate space.</summary>
         public const double PixelsPerTile = 32.0;
 
         private readonly string _filename;
@@ -26,27 +64,37 @@ namespace Factorio.Data
         private readonly bool _autoMeasure;
         private readonly double _targetTilesW;
         private readonly double _targetTilesH;
+        private readonly double _scaleMultiplier;
+        private readonly SpriteAlign _align;
 
         /// <summary>
-        /// Creates a sprite that automatically reads the PNG's pixel dimensions from <c>resources/</c>
-        /// and scales it uniformly to fit a <paramref name="tiles"/> × <paramref name="tiles"/> footprint.
+        /// Creates a sprite that automatically reads the PNG's visible pixel bounds from <c>resources/</c>,
+        /// scales it cleanly to a <paramref name="tiles"/> × <paramref name="tiles"/> grid footprint, and
+        /// centers/aligns it inside the entity hitbox.
         /// </summary>
-        /// <param name="filename">Path to the PNG, e.g. <c>Asset.Mod("graphics/entity/machine.png")</c>.</param>
-        /// <param name="tiles">Square entity size in tiles (default <c>3</c> for a 3×3 machine).</param>
-        public Sprite(string filename, double tiles = 3.0)
-            : this(filename, 0, 0, 1, 0, 0, autoMeasure: true, tiles, tiles)
+        public Sprite(
+            string filename,
+            double tiles = 3.0,
+            double shiftX = 0,
+            double shiftY = 0,
+            SpriteAlign align = SpriteAlign.Footprint)
+            : this(filename, 0, 0, 1, shiftX, shiftY, autoMeasure: true, tiles, tiles, 1.0, align)
         {
         }
 
         /// <summary>
-        /// Creates a sprite that automatically reads the PNG's pixel dimensions from <c>resources/</c>
-        /// and scales it uniformly to fit <paramref name="tilesWide"/> × <paramref name="tilesHigh"/> tiles.
+        /// Creates a sprite that automatically reads the PNG's visible pixel bounds from <c>resources/</c>,
+        /// scales it cleanly to a <paramref name="tilesWide"/> × <paramref name="tilesHigh"/> footprint, and
+        /// aligns it inside the entity hitbox.
         /// </summary>
-        /// <param name="filename">Path to the PNG, e.g. <c>Asset.Mod("graphics/entity/machine.png")</c>.</param>
-        /// <param name="tilesWide">Target width in tiles.</param>
-        /// <param name="tilesHigh">Target height in tiles.</param>
-        public Sprite(string filename, double tilesWide, double tilesHigh)
-            : this(filename, 0, 0, 1, 0, 0, autoMeasure: true, tilesWide, tilesHigh)
+        public Sprite(
+            string filename,
+            double tilesWide,
+            double tilesHigh,
+            double shiftX = 0,
+            double shiftY = 0,
+            SpriteAlign align = SpriteAlign.Footprint)
+            : this(filename, 0, 0, 1, shiftX, shiftY, autoMeasure: true, tilesWide, tilesHigh, 1.0, align)
         {
         }
 
@@ -59,7 +107,9 @@ namespace Factorio.Data
             double shiftY,
             bool autoMeasure = false,
             double targetTilesW = 0,
-            double targetTilesH = 0)
+            double targetTilesH = 0,
+            double scaleMultiplier = 1.0,
+            SpriteAlign align = SpriteAlign.Footprint)
         {
             _filename = filename;
             _width = width;
@@ -70,64 +120,80 @@ namespace Factorio.Data
             _autoMeasure = autoMeasure;
             _targetTilesW = targetTilesW;
             _targetTilesH = targetTilesH;
+            _scaleMultiplier = scaleMultiplier;
+            _align = align;
         }
 
         /// <summary>
-        /// Reads the PNG's real pixel dimensions from <c>resources/</c> at build time and scales it
-        /// automatically to fit a square <paramref name="tiles"/> × <paramref name="tiles"/> entity
-        /// (preserving aspect ratio).
+        /// Automatically inspects non-transparent pixels in <paramref name="filename"/>, scales it to fit a
+        /// square <paramref name="tiles"/> × <paramref name="tiles"/> footprint, and aligns it cleanly on the grid.
         /// </summary>
-        /// <param name="filename">Path to the PNG, e.g. <c>Asset.Mod("graphics/entity/condenser.png")</c>.</param>
-        /// <param name="tiles">Entity width/height in tiles (e.g. <c>3</c> for a 3×3 machine).</param>
-        public static Sprite Auto(string filename, double tiles = 3.0) =>
-            new(filename, tiles, tiles);
+        public static Sprite Auto(
+            string filename,
+            double tiles = 3.0,
+            double shiftX = 0,
+            double shiftY = 0,
+            SpriteAlign align = SpriteAlign.Footprint) =>
+            new(filename, tiles, shiftX, shiftY, align);
 
         /// <summary>
-        /// Reads the PNG's real pixel dimensions from <c>resources/</c> at build time and scales it
-        /// automatically to fit a <paramref name="tilesWide"/> × <paramref name="tilesHigh"/> entity
-        /// (preserving aspect ratio).
+        /// Automatically inspects non-transparent pixels in <paramref name="filename"/>, scales it to fit a
+        /// rectangular <paramref name="tilesWide"/> × <paramref name="tilesHigh"/> footprint, and aligns it on the grid.
         /// </summary>
-        /// <param name="filename">Path to the PNG, e.g. <c>Asset.Mod("graphics/entity/condenser.png")</c>.</param>
-        /// <param name="tilesWide">Target width in tiles (e.g. <c>2</c>).</param>
-        /// <param name="tilesHigh">Target height in tiles (e.g. <c>3</c>).</param>
-        public static Sprite Auto(string filename, double tilesWide, double tilesHigh) =>
-            new(filename, tilesWide, tilesHigh);
+        public static Sprite Auto(
+            string filename,
+            double tilesWide,
+            double tilesHigh,
+            double shiftX = 0,
+            double shiftY = 0,
+            SpriteAlign align = SpriteAlign.Footprint) =>
+            new(filename, tilesWide, tilesHigh, shiftX, shiftY, align);
 
         /// <summary>A picture drawn at its natural pixel size (<c>scale = 1</c>).</summary>
-        /// <param name="filename">Path to the PNG, e.g. <c>Asset.Mod("graphics/entity/pump.png")</c>.</param>
-        /// <param name="width">Width in pixels.</param>
-        /// <param name="height">Height in pixels.</param>
         public static Sprite File(string filename, double width, double height) =>
             new(filename, width, height, 1, 0, 0);
 
-        /// <summary>
-        /// A picture drawn with an explicit pixel box and <paramref name="scale"/>. If the actual PNG on
-        /// disk is smaller than <paramref name="width"/> × <paramref name="height"/>, the build automatically
-        /// clamps to the PNG's true size and adjusts <c>scale</c> so the rendered size stays the same.
-        /// </summary>
-        /// <param name="filename">Path to the PNG.</param>
-        /// <param name="width">Width in pixels.</param>
-        /// <param name="height">Height in pixels.</param>
-        /// <param name="scale">Scale to draw at; 0.5 draws at half size.</param>
+        /// <summary>A picture drawn with an explicit pixel box and <paramref name="scale"/>.</summary>
         public static Sprite Scaled(string filename, double width, double height, double scale) =>
             new(filename, width, height, scale, 0, 0);
 
-        /// <summary>The same sprite, moved by a number of tiles relative to entity centre.</summary>
-        /// <param name="x">Horizontal shift in tiles; positive is east.</param>
-        /// <param name="y">Vertical shift in tiles; positive is south.</param>
+        /// <summary>
+        /// Offsets this sprite in <b>tiles</b> relative to its aligned grid position:
+        /// <c>+x</c> = East (right), <c>-x</c> = West (left), <c>-y</c> = North (up), <c>+y</c> = South (down).
+        /// </summary>
         public Sprite Shift(double x, double y) =>
-            new(_filename, _width, _height, _scale, x, y, _autoMeasure, _targetTilesW, _targetTilesH);
+            new(_filename, _width, _height, _scale, _shiftX + x, _shiftY + y, _autoMeasure, _targetTilesW, _targetTilesH, _scaleMultiplier, _align);
 
-        /// <summary>Writes the sprite table, resolving automatic PNG measurements when available.</summary>
+        /// <summary>
+        /// Offsets this sprite in <b>pixels</b> (<c>32 pixels = 1 tile</c>, identical to Factorio's <c>util.by_pixel(x, y)</c>):
+        /// <c>+pixelsX</c> = right, <c>-pixelsY</c> = up, <c>+pixelsY</c> = down.
+        /// </summary>
+        public Sprite ShiftPixels(double pixelsX, double pixelsY) =>
+            Shift(pixelsX / PixelsPerTile, pixelsY / PixelsPerTile);
+
+        /// <summary>
+        /// Multiplies the sprite's rendered size by <paramref name="multiplier"/> (e.g. <c>1.15</c> = 15% larger,
+        /// <c>0.9</c> = 10% smaller) while keeping grid centering/footprint alignment intact!
+        /// </summary>
+        public Sprite ScaleBy(double multiplier) =>
+            new(_filename, _width, _height, _scale, _shiftX, _shiftY, _autoMeasure, _targetTilesW, _targetTilesH, _scaleMultiplier * multiplier, _align);
+
+        /// <summary>Chooses how transparent borders and vertical anchoring are handled (<see cref="SpriteAlign"/>).</summary>
+        public Sprite Align(SpriteAlign align) =>
+            new(_filename, _width, _height, _scale, _shiftX, _shiftY, _autoMeasure, _targetTilesW, _targetTilesH, _scaleMultiplier, align);
+
+        /// <summary>Writes the sprite table, resolving automatic PNG content bounds, scale, and grid alignment.</summary>
         public void Write(LuaWriter writer)
         {
             var width = _width;
             var height = _height;
-            var scale = _scale;
+            var scale = _scale * _scaleMultiplier;
+            var totalShiftX = _shiftX;
+            var totalShiftY = _shiftY;
 
             if (_autoMeasure)
             {
-                if (!Asset.TryReadModPngSize(_filename, out var actualW, out var actualH))
+                if (!Asset.TryReadModPngBounds(_filename, out var bounds))
                 {
                     throw new InvalidOperationException(
                         $"Sprite.Auto could not find or read PNG file for '{_filename}'. " +
@@ -135,23 +201,63 @@ namespace Factorio.Data
                         "or pass explicit dimensions with Sprite.Scaled(path, width, height, scale).");
                 }
 
-                width = actualW;
-                height = actualH;
+                width = bounds.CanvasWidth;
+                height = bounds.CanvasHeight;
                 var desiredPxW = Math.Max(1.0, _targetTilesW * PixelsPerTile);
                 var desiredPxH = Math.Max(1.0, _targetTilesH * PixelsPerTile);
-                scale = Math.Round(Math.Min(desiredPxW / actualW, desiredPxH / actualH), 4);
+
+                if (_align == SpriteAlign.Canvas)
+                {
+                    scale = Math.Round(Math.Min(desiredPxW / bounds.CanvasWidth, desiredPxH / bounds.CanvasHeight) * _scaleMultiplier, 4);
+                }
+                else
+                {
+                    var contentW = Math.Max(1.0, bounds.ContentWidth);
+                    var contentH = Math.Max(1.0, bounds.ContentHeight);
+
+                    double rawScale = _align switch
+                    {
+                        // Footprint: if the building is taller than the footprint aspect ratio (standard
+                        // Factorio 45° building with roof/tower/chimney), match width cleanly to tilesWide
+                        // so the base fills its horizontal grid tiles instead of shrinking!
+                        SpriteAlign.Footprint when (contentH / contentW) > (desiredPxH / desiredPxW) =>
+                            desiredPxW / contentW,
+                        _ => Math.Min(desiredPxW / contentW, desiredPxH / contentH),
+                    };
+
+                    scale = Math.Round(rawScale * _scaleMultiplier, 4);
+
+                    // Horizontal offset that places visible content center exactly at X = 0:
+                    var autoShiftX = -((bounds.ContentCenterX - bounds.CanvasWidth * 0.5) * scale) / PixelsPerTile;
+
+                    // Vertical offset:
+                    // - Bottom: always anchor bottom of visible art to +tilesHigh / 2
+                    // - Footprint: if art height exceeds desiredPxH (tall building), anchor base flush to +tilesHigh / 2;
+                    //              otherwise center visible art on Y = 0
+                    // - Center: always center visible art on Y = 0
+                    bool anchorBottom = _align == SpriteAlign.Bottom ||
+                        (_align == SpriteAlign.Footprint && contentH * rawScale > desiredPxH + 0.5);
+
+                    var autoShiftY = anchorBottom
+                        ? (_targetTilesH * 0.5) - ((bounds.ContentBottom - bounds.CanvasHeight * 0.5) * scale) / PixelsPerTile
+                        : -((bounds.ContentCenterY - bounds.CanvasHeight * 0.5) * scale) / PixelsPerTile;
+
+                    totalShiftX = Math.Round(autoShiftX + _shiftX, 4);
+                    totalShiftY = Math.Round(autoShiftY + _shiftY, 4);
+                }
             }
             else if (Asset.TryReadModPngSize(_filename, out var actualW, out var actualH) &&
                      (width > actualW || height > actualH))
             {
-                // The user passed larger dimensions than the actual PNG file on disk (which always
-                // crashes Factorio with "The given sprite rectangle ... is outside the actual sprite size").
-                // Preserve their requested on-screen size (width * scale × height * scale) automatically!
                 var desiredPxW = width * scale;
                 var desiredPxH = height * scale;
                 width = actualW;
                 height = actualH;
                 scale = Math.Round(Math.Min(desiredPxW / actualW, desiredPxH / actualH), 4);
+            }
+            else
+            {
+                scale = Math.Round(scale, 4);
             }
 
             writer.BeginTable();
@@ -166,12 +272,12 @@ namespace Factorio.Data
                 writer.Key("scale");
                 writer.Value(scale);
             }
-            if (_shiftX != 0 || _shiftY != 0)
+            if (Math.Abs(totalShiftX) > 1e-6 || Math.Abs(totalShiftY) > 1e-6)
             {
                 writer.Key("shift");
                 writer.BeginArray();
-                writer.Value(_shiftX);
-                writer.Value(_shiftY);
+                writer.Value(Math.Round(totalShiftX, 4));
+                writer.Value(Math.Round(totalShiftY, 4));
                 writer.EndArray();
             }
             writer.EndTable();
@@ -181,11 +287,13 @@ namespace Factorio.Data
     /// <summary>
     /// A crafting machine's <c>graphics_set</c>: what the machine looks like on the map.
     /// <code>
-    /// // Automatic PNG measurement &amp; scaling to a 3x3 machine:
+    /// // Automatic transparent-margin trimming, grid scaling, &amp; footprint alignment:
     /// Graphics = GraphicsSet.Auto(Asset.Mod("graphics/entity/atmospheric-condenser.png"), tiles: 3);
     ///
-    /// // Or rectangular 2x3 machine:
-    /// Graphics = GraphicsSet.Auto(Asset.Mod("graphics/entity/condenser.png"), tilesWide: 2, tilesHigh: 3);
+    /// // Plus effortless manual fine-tuning in tiles OR pixels:
+    /// Graphics = GraphicsSet.Auto(Asset.Mod("graphics/entity/condenser.png"), tilesWide: 2, tilesHigh: 3)
+    ///     .Shift(0, -0.25)       // negative Y = up (North), positive X = right (East), in tiles
+    ///     .ScaleBy(1.1);         // optional scale multiplier
     /// </code>
     /// </summary>
     public sealed class GraphicsSet : ILuaValue
@@ -208,25 +316,34 @@ namespace Factorio.Data
             sprite == null ? null : new GraphicsSet(sprite);
 
         /// <summary>
-        /// Automatically measures the PNG inside <c>resources/</c> and scales it uniformly to fit a
-        /// <paramref name="tiles"/> × <paramref name="tiles"/> machine footprint.
+        /// Automatically inspects visible PNG bounds inside <c>resources/</c>, scales cleanly to a
+        /// <paramref name="tiles"/> × <paramref name="tiles"/> machine footprint, and aligns it on the grid.
         /// </summary>
-        public static GraphicsSet Auto(string filename, double tiles = 3.0) =>
-            new(Sprite.Auto(filename, tiles));
+        public static GraphicsSet Auto(
+            string filename,
+            double tiles = 3.0,
+            double shiftX = 0,
+            double shiftY = 0,
+            SpriteAlign align = SpriteAlign.Footprint) =>
+            new(Sprite.Auto(filename, tiles, shiftX, shiftY, align));
 
         /// <summary>
-        /// Automatically measures the PNG inside <c>resources/</c> and scales it uniformly to fit a
-        /// <paramref name="tilesWide"/> × <paramref name="tilesHigh"/> machine footprint.
+        /// Automatically inspects visible PNG bounds inside <c>resources/</c>, scales cleanly to a
+        /// <paramref name="tilesWide"/> × <paramref name="tilesHigh"/> footprint, and aligns it on the grid.
         /// </summary>
-        public static GraphicsSet Auto(string filename, double tilesWide, double tilesHigh) =>
-            new(Sprite.Auto(filename, tilesWide, tilesHigh));
+        public static GraphicsSet Auto(
+            string filename,
+            double tilesWide,
+            double tilesHigh,
+            double shiftX = 0,
+            double shiftY = 0,
+            SpriteAlign align = SpriteAlign.Footprint) =>
+            new(Sprite.Auto(filename, tilesWide, tilesHigh, shiftX, shiftY, align));
 
         /// <summary>A machine drawn from one picture in all directions.</summary>
         public static GraphicsSet Of(Sprite sprite) => new(sprite);
 
-        /// <summary>
-        /// A machine drawn from one PNG file, automatically measured and scaled to <paramref name="tiles"/> × <paramref name="tiles"/> tiles.
-        /// </summary>
+        /// <summary>A machine drawn from one PNG file, automatically measured and aligned to <paramref name="tiles"/> × <paramref name="tiles"/> tiles.</summary>
         public static GraphicsSet Of(string filename, double tiles = 3.0) =>
             Auto(filename, tiles);
 
@@ -240,6 +357,31 @@ namespace Factorio.Data
 
         /// <summary>A machine drawn from multiple stacked sprite layers (e.g. base sprite + shadow).</summary>
         public static GraphicsSet Layers(params Sprite[] layers) => new(layers);
+
+        /// <summary>
+        /// Offsets every layer in this <see cref="GraphicsSet"/> in <b>tiles</b>:
+        /// <c>+x</c> = East (right), <c>-x</c> = West (left), <c>-y</c> = North (up), <c>+y</c> = South (down).
+        /// </summary>
+        public GraphicsSet Shift(double x, double y) =>
+            new(_layers.Select(l => l.Shift(x, y)).ToArray());
+
+        /// <summary>
+        /// Offsets every layer in this <see cref="GraphicsSet"/> in <b>pixels</b> (<c>32 pixels = 1 tile</c>,
+        /// identical to Factorio's <c>util.by_pixel(x, y)</c>).
+        /// </summary>
+        public GraphicsSet ShiftPixels(double pixelsX, double pixelsY) =>
+            new(_layers.Select(l => l.ShiftPixels(pixelsX, pixelsY)).ToArray());
+
+        /// <summary>
+        /// Multiplies the scale of every layer by <paramref name="multiplier"/> (e.g. <c>1.15</c> = 15% bigger)
+        /// while keeping grid centering and footprint alignment intact!
+        /// </summary>
+        public GraphicsSet ScaleBy(double multiplier) =>
+            new(_layers.Select(l => l.ScaleBy(multiplier)).ToArray());
+
+        /// <summary>Sets the <see cref="SpriteAlign"/> mode for every layer in this <see cref="GraphicsSet"/>.</summary>
+        public GraphicsSet Align(SpriteAlign align) =>
+            new(_layers.Select(l => l.Align(align)).ToArray());
 
         /// <inheritdoc />
         public void Write(LuaWriter writer)

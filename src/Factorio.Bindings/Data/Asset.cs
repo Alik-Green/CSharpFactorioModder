@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Runtime.CompilerServices;
 
 namespace Factorio.Data
@@ -110,6 +111,210 @@ namespace Factorio.Data
             {
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Reads the non-transparent pixel bounding box (<c>alpha &gt; 10</c>) of a mod PNG on disk so
+        /// <see cref="Sprite"/> and <see cref="GraphicsSet"/> automatically trim empty transparent borders,
+        /// scale the visible artwork accurately to the tile grid, and cancel off-center margins.
+        /// Falls back cleanly to the full PNG canvas dimensions when alpha chunks are absent.
+        /// </summary>
+        public static bool TryReadModPngBounds(string? resourcePath, out PngBounds bounds)
+        {
+            bounds = default;
+            if (!TryResolveModFile(resourcePath, out var fullPath))
+                return false;
+
+            return TryReadPngBounds(fullPath, out bounds);
+        }
+
+        /// <summary>Reads canvas size and visible non-transparent pixel bounds from a PNG file.</summary>
+        public static bool TryReadPngBounds(string filePath, out PngBounds bounds)
+        {
+            bounds = default;
+            if (!TryReadPngHeader(filePath, out var canvasW, out var canvasH))
+                return false;
+
+            // Default fallback: entire canvas is treated as visible content.
+            bounds = new PngBounds(canvasW, canvasH, 0, 0, canvasW - 1, canvasH - 1);
+
+            if ((long)canvasW * canvasH > 67_108_864L)
+                return true;
+
+            try
+            {
+                using var stream = File.OpenRead(filePath);
+                Span<byte> sig = stackalloc byte[8];
+                if (stream.Read(sig) < 8) return true;
+
+                int bitDepth = 0, colorType = 0, interlace = 0;
+                byte[]? trns = null;
+                using var idat = new MemoryStream();
+                Span<byte> chunkHeader = stackalloc byte[8];
+
+                while (stream.Read(chunkHeader) == 8)
+                {
+                    int len = (chunkHeader[0] << 24) | (chunkHeader[1] << 16) | (chunkHeader[2] << 8) | chunkHeader[3];
+                    if (len < 0) break;
+
+                    bool isIhdr = chunkHeader[4] == 'I' && chunkHeader[5] == 'H' && chunkHeader[6] == 'D' && chunkHeader[7] == 'R';
+                    bool isTrns = chunkHeader[4] == 't' && chunkHeader[5] == 'R' && chunkHeader[6] == 'N' && chunkHeader[7] == 'S';
+                    bool isIdat = chunkHeader[4] == 'I' && chunkHeader[5] == 'D' && chunkHeader[6] == 'A' && chunkHeader[7] == 'T';
+                    bool isIend = chunkHeader[4] == 'I' && chunkHeader[5] == 'E' && chunkHeader[6] == 'N' && chunkHeader[7] == 'D';
+
+                    if (isIend) break;
+
+                    if (isIhdr && len >= 13)
+                    {
+                        var ihdr = new byte[len];
+                        if (ReadExact(stream, ihdr, len) < len) return true;
+                        bitDepth = ihdr[8];
+                        colorType = ihdr[9];
+                        interlace = ihdr[12];
+                    }
+                    else if (isTrns)
+                    {
+                        trns = new byte[len];
+                        if (ReadExact(stream, trns, len) < len) return true;
+                    }
+                    else if (isIdat)
+                    {
+                        var buf = new byte[Math.Min(len, 65536)];
+                        int rem = len;
+                        while (rem > 0)
+                        {
+                            int n = stream.Read(buf, 0, Math.Min(rem, buf.Length));
+                            if (n <= 0) return true;
+                            idat.Write(buf, 0, n);
+                            rem -= n;
+                        }
+                    }
+                    else
+                    {
+                        stream.Seek(len, SeekOrigin.Current);
+                    }
+
+                    // Skip 4-byte CRC
+                    stream.Seek(4, SeekOrigin.Current);
+                }
+
+                // Only non-interlaced PNGs with real IDAT data need scanline decoding.
+                if (interlace != 0 || idat.Length == 0)
+                    return true;
+
+                // Determine bytes per pixel for 8-bit and 16-bit PNGs (covers RGBA, Gray+A, Indexed+tRNS, RGB+tRNS).
+                int bpp = (colorType, bitDepth) switch
+                {
+                    (6, 8) => 4,
+                    (6, 16) => 8,
+                    (4, 8) => 2,
+                    (4, 16) => 4,
+                    (3, 8) => 1,
+                    (2, 8) => 3,
+                    (2, 16) => 6,
+                    _ => 0,
+                };
+                if (bpp == 0) return true;
+
+                // If RGB has no tRNS chunk, every pixel is 100% opaque -> full canvas!
+                if (colorType == 2 && (trns == null || trns.Length < 6))
+                    return true;
+
+                idat.Position = 0;
+                using var zlib = new ZLibStream(idat, CompressionMode.Decompress);
+
+                int stride = canvasW * bpp;
+                var prevRow = new byte[stride];
+                var currRow = new byte[stride];
+                var rawRow = new byte[stride + 1];
+
+                int minX = canvasW, minY = canvasH, maxX = -1, maxY = -1;
+                const int AlphaThreshold = 10;
+
+                for (int y = 0; y < canvasH; y++)
+                {
+                    if (ReadExact(zlib, rawRow, stride + 1) < stride + 1)
+                        return true;
+
+                    byte filter = rawRow[0];
+                    for (int i = 0; i < stride; i++)
+                    {
+                        byte raw = rawRow[i + 1];
+                        byte left = i >= bpp ? currRow[i - bpp] : (byte)0;
+                        byte up = prevRow[i];
+                        byte upLeft = i >= bpp ? prevRow[i - bpp] : (byte)0;
+
+                        currRow[i] = filter switch
+                        {
+                            0 => raw,
+                            1 => (byte)(raw + left),
+                            2 => (byte)(raw + up),
+                            3 => (byte)(raw + ((left + up) >> 1)),
+                            4 => (byte)(raw + PaethPredictor(left, up, upLeft)),
+                            _ => raw,
+                        };
+                    }
+
+                    for (int x = 0; x < canvasW; x++)
+                    {
+                        int off = x * bpp;
+                        int alpha = colorType switch
+                        {
+                            6 => bitDepth == 8 ? currRow[off + 3] : currRow[off + 6],
+                            4 => bitDepth == 8 ? currRow[off + 1] : currRow[off + 2],
+                            3 => trns != null && currRow[off] < trns.Length ? trns[currRow[off]] : 255,
+                            2 when bitDepth == 8 =>
+                                (currRow[off] == trns![1] && currRow[off + 1] == trns[3] && currRow[off + 2] == trns[5]) ? 0 : 255,
+                            2 =>
+                                (currRow[off] == trns![0] && currRow[off + 1] == trns[1] &&
+                                 currRow[off + 2] == trns[2] && currRow[off + 3] == trns[3] &&
+                                 currRow[off + 4] == trns[4] && currRow[off + 5] == trns[5]) ? 0 : 255,
+                            _ => 255,
+                        };
+
+                        if (alpha > AlphaThreshold)
+                        {
+                            if (x < minX) minX = x;
+                            if (x > maxX) maxX = x;
+                            if (y < minY) minY = y;
+                            if (y > maxY) maxY = y;
+                        }
+                    }
+
+                    (prevRow, currRow) = (currRow, prevRow);
+                }
+
+                if (maxX >= minX && maxY >= minY)
+                    bounds = new PngBounds(canvasW, canvasH, minX, minY, maxX, maxY);
+
+                return true;
+            }
+            catch
+            {
+                return true;
+            }
+        }
+
+        private static int ReadExact(Stream stream, byte[] buffer, int count)
+        {
+            int total = 0;
+            while (total < count)
+            {
+                int n = stream.Read(buffer, total, count - total);
+                if (n <= 0) break;
+                total += n;
+            }
+            return total;
+        }
+
+        private static int PaethPredictor(int a, int b, int c)
+        {
+            int p = a + b - c;
+            int pa = Math.Abs(p - a);
+            int pb = Math.Abs(p - b);
+            int pc = Math.Abs(p - c);
+            if (pa <= pb && pa <= pc) return a;
+            return pb <= pc ? b : c;
         }
 
         private static string? StripOwnPrefix(string path)
@@ -298,5 +503,30 @@ namespace Factorio.Data
         public IEnumerator<IconLayer> GetEnumerator() => _items.GetEnumerator();
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
+    /// <summary>Canvas dimensions and non-transparent content bounding box of a PNG image.</summary>
+    public readonly record struct PngBounds(
+        int CanvasWidth,
+        int CanvasHeight,
+        int MinX,
+        int MinY,
+        int MaxX,
+        int MaxY)
+    {
+        /// <summary>Width of visible non-transparent content in pixels.</summary>
+        public int ContentWidth => MaxX >= MinX ? (MaxX - MinX + 1) : CanvasWidth;
+
+        /// <summary>Height of visible non-transparent content in pixels.</summary>
+        public int ContentHeight => MaxY >= MinY ? (MaxY - MinY + 1) : CanvasHeight;
+
+        /// <summary>Horizontal pixel centre of the visible content.</summary>
+        public double ContentCenterX => MaxX >= MinX ? (MinX + MaxX + 1) * 0.5 : CanvasWidth * 0.5;
+
+        /// <summary>Vertical pixel centre of the visible content.</summary>
+        public double ContentCenterY => MaxY >= MinY ? (MinY + MaxY + 1) * 0.5 : CanvasHeight * 0.5;
+
+        /// <summary>Bottom pixel edge of the visible content.</summary>
+        public double ContentBottom => MaxY >= MinY ? (MaxY + 1) : CanvasHeight;
     }
 }

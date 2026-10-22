@@ -33,7 +33,7 @@ jobs:
             if ("$env:GITHUB_REF" -like "refs/tags/v*") {
               $ver = "$env:GITHUB_REF" -replace '^refs/tags/v',''
             } else {
-              $ver = "1.0.4"
+              $ver = "1.0.5"
             }
           }
           $ver = $ver.TrimStart('v')
@@ -149,9 +149,8 @@ jobs:
                 '        LocalisedName = "Atmospheric Condenser";'
                 '        Icon = Asset.Mod("graphics/entity/atmospheric-condenser.png");'
                 '        Corpse = Vanilla.Entities.MediumRemnants;'
-                '        CollisionBox = BoundingBox.Collision(2, 3);'
-                '        SelectionBox = BoundingBox.Selection(2, 3);'
-                '        Graphics = GraphicsSet.Auto(Asset.Mod("graphics/entity/atmospheric-condenser.png"), tiles: 3);'
+                '        SetSize(2, 3);'
+                '        Graphics = GraphicsSet.Auto(Asset.Mod("graphics/entity/atmospheric-condenser.png"), tilesWide: 2, tilesHigh: 3).Shift(0, -0.15).ScaleBy(1.05);'
                 '        CraftingCategories = [CraftingCategory.Chemistry];'
                 '        CraftingSpeed = 1.0;'
                 '        EnergyUsage = Energy.Kilowatts(180);'

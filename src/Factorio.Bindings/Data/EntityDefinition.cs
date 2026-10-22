@@ -23,6 +23,51 @@ namespace Factorio.Data
         }
 
         /// <summary>
+        /// Sets both <see cref="CollisionBox"/> and <see cref="SelectionBox"/> cleanly for a square
+        /// <paramref name="tiles"/> × <paramref name="tiles"/> entity (e.g. <c>SetSize(3)</c> for a 3×3 machine).
+        /// </summary>
+        public void SetSize(double tiles) => SetSize(tiles, tiles);
+
+        /// <summary>
+        /// Sets both <see cref="CollisionBox"/> and <see cref="SelectionBox"/> cleanly for a rectangular
+        /// <paramref name="tilesWide"/> × <paramref name="tilesHigh"/> entity (e.g. <c>SetSize(2, 3)</c>).
+        /// </summary>
+        public void SetSize(double tilesWide, double tilesHigh)
+        {
+            CollisionBox = BoundingBox.Collision(tilesWide, tilesHigh);
+            SelectionBox = BoundingBox.Selection(tilesWide, tilesHigh);
+        }
+
+        /// <summary>
+        /// Marks this entity minable AND tells <see cref="ModBuilder.Add(PrototypeDefinition)"/> to
+        /// automatically generate its matching <see cref="ItemDefinition"/> (<c>PlaceResult = Name</c>,
+        /// inheriting icon, localised name/description, subgroup, and order) WITHOUT generating a recipe.
+        /// Use <see cref="Craftable"/> when you also want the crafting recipe generated automatically.
+        /// </summary>
+        public void Placeable(double stackSize = 50, Subgroup? subgroup = null)
+        {
+            if (MinableResult == null)
+                MinableResult = Name;
+
+            _companionFactory = self =>
+            {
+                var item = new ItemDefinition(self.Name)
+                {
+                    PlaceResult = self.Name,
+                    StackSize = stackSize,
+                };
+                if (self.Icon != null) item.Icon = self.Icon;
+                if (self.Icons != null) item.Icons = self.Icons;
+                if (self.IconSize > 0) item.IconSize = self.IconSize;
+                if (subgroup != null) item.Subgroup = subgroup;
+                if (self.Order != null) item.Order = self.Order;
+                if (self.LocalisedName != null) item.LocalisedName = self.LocalisedName;
+                if (self.LocalisedDescription != null) item.LocalisedDescription = self.LocalisedDescription;
+                return new PrototypeDefinition[] { item };
+            };
+        }
+
+        /// <summary>
         /// All-in-one QoL helper: marks this machine minable AND tells <see cref="ModBuilder.Add(PrototypeDefinition)"/>
         /// to automatically generate its matching <see cref="ItemDefinition"/> (inheriting icon,
         /// localised name/description, subgroup, order, and <c>PlaceResult = Name</c>) plus its
