@@ -65,6 +65,10 @@ public sealed class TranspilerFixture : IDisposable
     /// </summary>
     public IReadOnlyList<string> Utilities => Directory
         .GetFiles(Path.Combine(Root, "src/Factorio.Bindings/Utilities"), "*.cs")
+        .Concat(new[]
+        {
+            Path.Combine(Root, "src/Factorio.Bindings/RuntimeStubs/VanillaRuntime.cs"),
+        })
         .OrderBy(f => f, StringComparer.Ordinal).ToList();
     public string ExampleMod => Path.Combine(Root, "mods/HelloFactorio/src/HelloFactorio.cs");
 
@@ -86,24 +90,26 @@ public sealed class TranspilerFixture : IDisposable
         foreach (var s in sources)
             Assert.True(File.Exists(s), "missing source: " + s);
 
+        var rsp = Path.Combine(outDir, "compile.rsp");
+        static string Rel(string p) => Path.GetRelativePath(Root, p).Replace('\\', '/');
+        File.WriteAllText(rsp, $"-s {string.Join(";", sources.Select(Rel))} -d {Rel(outDir)} -noconcurrent\n");
+
         var psi = new ProcessStartInfo("dotnet")
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            WorkingDirectory = WorkDir,
+            WorkingDirectory = Root,
         };
         psi.ArgumentList.Add(CompilerDll);
-        psi.ArgumentList.Add("-s");
-        psi.ArgumentList.Add(string.Join(";", sources));
-        psi.ArgumentList.Add("-d");
-        psi.ArgumentList.Add(outDir);
+        psi.ArgumentList.Add("@" + rsp);
 
         using var p = Process.Start(psi)!;
-        var stdout = p.StandardOutput.ReadToEnd();
-        var stderr = p.StandardError.ReadToEnd();
+        var stdoutTask = p.StandardOutput.ReadToEndAsync();
+        var stderrTask = p.StandardError.ReadToEndAsync();
         p.WaitForExit();
+        Task.WaitAll(stdoutTask, stderrTask);
         var files = Directory.GetFiles(outDir, "*.lua").Select(Path.GetFileName).OrderBy(x => x).ToList();
-        return new TranspileResult(p.ExitCode, stdout, stderr, outDir, files!);
+        return new TranspileResult(p.ExitCode, stdoutTask.Result, stderrTask.Result, outDir, files!);
     }
 
     public void Dispose()
@@ -120,7 +126,7 @@ public static class LuaChecks
     /// <summary>Parse a file with a real Lua 5.2 compiler; this is the authoritative syntax check.</summary>
     public static (bool ok, string message) ParseLua52(string path)
     {
-        foreach (var exe in new[] { "luac5.2", "luac" })
+        foreach (var exe in new[] { "luac5.2", "luac52", "luac54", "luac" })
         {
             var psi = new ProcessStartInfo(exe) { RedirectStandardError = true, RedirectStandardOutput = true };
             psi.ArgumentList.Add("-p");

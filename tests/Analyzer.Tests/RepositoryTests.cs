@@ -34,7 +34,9 @@ public class RepositoryTests
     public void ShippedModIsClean(string name)
     {
         var directory = Path.Combine(AnalyzerHarness.RepositoryRoot, "mods", name);
-        var files = Directory.EnumerateFiles(directory, "*.cs", SearchOption.AllDirectories).ToList();
+        var files = Directory.EnumerateFiles(directory, "*.cs", SearchOption.AllDirectories)
+            .Where(f => !f.Split(Path.DirectorySeparatorChar).Any(p => p is "bin" or "obj"))
+            .ToList();
 
         var findings = Analysis.Run(files);
 

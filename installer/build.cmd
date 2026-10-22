@@ -15,7 +15,7 @@ setlocal
 
 set "VERSION=%~1"
 if "%VERSION%"=="" (
-  set /p VERSION=Version (1.2.3): 
+  set /p "VERSION=Version (1.2.3): "
 )
 if "%VERSION%"=="" (
   echo error: a version is required.
@@ -26,6 +26,7 @@ set "VERSION=%VERSION:v=%"
 
 set "ROOT=%~dp0.."
 pushd "%ROOT%"
+set "ROOT=%CD%"
 
 rem The Rider plugin is optional.
 set "PLUGIN="

@@ -34,7 +34,8 @@ public static class DataEntryGenerator
         string Lua,
         IReadOnlyList<PrototypeDefinition> Prototypes,
         IReadOnlySet<string> Inherited,
-        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> Names);
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> Names,
+        string? SettingsLua = null);
 
     /// <summary>
     /// Compiles <paramref name="sources"/>, runs the mod's <see cref="ModDefinition"/> and writes
@@ -50,7 +51,12 @@ public static class DataEntryGenerator
     /// </param>
     /// <returns>The generated Lua and the definitions it came from.</returns>
     /// <exception cref="ToolException">The sources do not compile, or the entry cannot be run.</exception>
-    public static Result Generate(string entryType, IReadOnlyList<string> sources, string apiVersion, string? modName = null)
+    public static Result Generate(
+        string entryType,
+        IReadOnlyList<string> sources,
+        string apiVersion,
+        string? modName = null,
+        IReadOnlyList<string>? resourceRoots = null)
     {
         if (sources.Count == 0)
             throw new ToolException(
@@ -78,27 +84,42 @@ public static class DataEntryGenerator
         var definition = (ModDefinition)Activator.CreateInstance(type)!;
         var builder = new ModBuilder();
 
-        // Asset.Mod writes paths the game can resolve; that needs the mod's name, which only the
-        // build knows. Restored afterwards so a second build in the same process is not affected.
+        // Asset.Mod & Sprite.Auto / Icon auto-sizing resolve mod files using the mod's name and
+        // resources/ directories throughout both Define() and Write().
         var previousSource = Asset.Source;
+        var previousRoots = Asset.ResourceRoots;
         Asset.Source = modName;
+        Asset.ResourceRoots = ResolveResourceRoots(sources, resourceRoots);
+        IReadOnlyList<PrototypeDefinition> prototypes;
+        string lua;
+        string? settingsLua;
         try
         {
-            definition.Define(builder);
-        }
-        catch (Exception e)
-        {
-            var inner = e is TargetInvocationException { InnerException: { } innerException } ? innerException : e;
-            throw new ToolException($"dataEntry '{entryType}' failed while defining prototypes: {inner.Message}");
+            try
+            {
+                definition.Define(builder);
+            }
+            catch (Exception e)
+            {
+                var inner = e is TargetInvocationException { InnerException: { } innerException } ? innerException : e;
+                throw new ToolException($"dataEntry '{entryType}' failed while defining prototypes: {inner.Message}");
+            }
+
+            prototypes = builder.Prototypes;
+            if (prototypes.Count == 0)
+                throw new ToolException($"dataEntry '{entryType}' defined no prototypes (did Define() call mod.Add?)");
+
+            var settingsProtos = prototypes.Where(p => p is SettingDefinition).ToList();
+            var dataProtos = prototypes.Where(p => p is not SettingDefinition).ToList();
+
+            lua = dataProtos.Count > 0 ? Write(dataProtos, apiVersion) : string.Empty;
+            settingsLua = settingsProtos.Count > 0 ? WriteSettings(settingsProtos, apiVersion) : null;
         }
         finally
         {
             Asset.Source = previousSource;
+            Asset.ResourceRoots = previousRoots;
         }
-
-        var prototypes = builder.Prototypes;
-        if (prototypes.Count == 0)
-            throw new ToolException($"dataEntry '{entryType}' defined no prototypes (did Define() call mod.Add?)");
 
         // Which prototypes take their unset fields from a vanilla one. The data-stage check has to
         // know: it cannot see the game's prototypes, and would report the inherited fields as
@@ -113,7 +134,36 @@ public static class DataEntryGenerator
             prototype => (IReadOnlyDictionary<string, string>)prototype.Localisations,
             StringComparer.Ordinal);
 
-        return new Result(Write(prototypes, apiVersion), prototypes, inherited, names);
+        return new Result(lua, prototypes, inherited, names, settingsLua);
+    }
+
+    private static IReadOnlyList<string> ResolveResourceRoots(
+        IReadOnlyList<string> sources,
+        IReadOnlyList<string>? explicitRoots)
+    {
+        var roots = new List<string>();
+        if (explicitRoots != null)
+        {
+            foreach (var r in explicitRoots)
+            {
+                if (!string.IsNullOrWhiteSpace(r) && !roots.Contains(r, StringComparer.OrdinalIgnoreCase))
+                    roots.Add(r);
+            }
+        }
+
+        foreach (var source in sources)
+        {
+            var dir = Path.GetDirectoryName(Path.GetFullPath(source));
+            for (var depth = 0; depth < 3 && dir != null; depth++)
+            {
+                var candidate = Path.Combine(dir, "resources");
+                if (Directory.Exists(candidate) && !roots.Contains(candidate, StringComparer.OrdinalIgnoreCase))
+                    roots.Add(candidate);
+                dir = Directory.GetParent(dir)?.FullName;
+            }
+        }
+
+        return roots;
     }
 
     /// <summary>Writes the collected definitions as a complete <c>data.lua</c>.</summary>
@@ -132,6 +182,19 @@ public static class DataEntryGenerator
         writer.Line("");
 
         return writer + Inherit + "data:extend(prototypes)\n";
+    }
+
+    /// <summary>Writes collected <see cref="SettingDefinition"/> objects as <c>settings.lua</c>.</summary>
+    public static string WriteSettings(IReadOnlyList<PrototypeDefinition> settings, string apiVersion)
+    {
+        var writer = new LuaWriter(apiVersion);
+        writer.Line("-- Generated from C# by factorio-mod. Do not edit: change the setting definitions under data/ and rebuild.");
+        writer.Line("data:extend(");
+        writer.BeginArray();
+        foreach (var setting in settings) writer.Value(setting);
+        writer.EndArray();
+        writer.Line(")");
+        return writer.ToString();
     }
 
     /// <summary>

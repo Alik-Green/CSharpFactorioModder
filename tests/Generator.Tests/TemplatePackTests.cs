@@ -108,7 +108,7 @@ public class TemplatePackTests
             // The data stage compiles and produces prototypes - the build itself would, but this is
             // the part that would fail if a rename broke an identifier.
             var result = Factorio.ModTool.Data.DataEntryGenerator.Generate(
-                project.DataEntry, project.DataSourceFiles(), project.FactorioVersion, project.Name);
+                project.DataEntry!, project.DataSourceFiles(), project.FactorioVersion, project.Name);
             Assert.Equal(2, result.Prototypes.Count);
             Assert.Contains("AirFilter-token", result.Lua);
         }

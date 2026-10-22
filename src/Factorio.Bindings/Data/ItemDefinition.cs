@@ -8,18 +8,6 @@ namespace Factorio.Data
     /// A placeable machine needs two prototypes - the entity and the item that places it - and the
     /// item points at the entity with <see cref="PlaceResult"/>.
     /// </para>
-    /// <code>
-    /// public sealed class ChemicalAssemblerItem : ItemDefinition
-    /// {
-    ///     public ChemicalAssemblerItem() : base("demo-chemical-assembler")
-    ///     {
-    ///         Icon = Asset.Base("graphics/icons/assembling-machine-1.png");
-    ///         IconSize = 64;
-    ///         StackSize = 50;
-    ///         PlaceResult = EntityRef.Of("demo-chemical-assembler");
-    ///     }
-    /// }
-    /// </code>
     /// </summary>
     public class ItemDefinition : PrototypeDefinition
     {
@@ -39,19 +27,16 @@ namespace Factorio.Data
         }
 
         /// <summary>
-        /// The entity this item places, for a machine: <c>EntityRef.Of("demo-assembler")</c>. Leave
-        /// it unset for a plain item such as a plate or a pellet.
+        /// The entity this item places when built in the world:
+        /// e.g. <c>EntityRef.Of("atmospheric-condenser")</c> or <c>"atmospheric-condenser"</c>.
         /// </summary>
-        public string? PlaceResult
+        public EntityId? PlaceResult
         {
             get => Get("place_result") as string;
-            set => Set("place_result", value);
+            set => Set("place_result", value?.Name);
         }
 
-        /// <summary>
-        /// The item flags: special behaviour such as <c>ItemFlag.NotStackable</c>. Most items need
-        /// none, which is also why an unset <c>flags</c> writes nothing.
-        /// </summary>
+        /// <summary>Item behaviour flags such as <c>ItemFlag.NotStackable</c>.</summary>
         public ItemFlag Flags
         {
             get => _flags;
@@ -62,11 +47,11 @@ namespace Factorio.Data
             }
         }
 
-        /// <summary>How much fuel the item is worth; unset for a non-fuel item.</summary>
-        public string? FuelValue
+        /// <summary>How much fuel energy the item is worth (e.g. <c>Energy.Megajoules(4)</c>).</summary>
+        public EnergyValue? FuelValue
         {
             get => Get("fuel_value") as string;
-            set => Set("fuel_value", value);
+            set => Set("fuel_value", value?.Formatted);
         }
     }
 }

@@ -50,6 +50,8 @@ public static class CommandLine
     public static string Display(string root, string path)
     {
         var relative = Path.GetRelativePath(root, path);
-        return relative.StartsWith("..", StringComparison.Ordinal) || Path.IsPathRooted(relative) ? path : relative;
+        return relative.StartsWith("..", StringComparison.Ordinal) || Path.IsPathRooted(relative)
+            ? path
+            : relative.Replace('\\', '/');
     }
 }

@@ -1,13 +1,17 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace Factorio.Data
 {
     /// <summary>
-    /// Where a pipe connects to a fluid box, as an offset from the entity's centre.
+    /// One pipe connection on the outside of a machine: which side it leaves through and at what
+    /// offset from the entity centre.
     /// <para>
-    /// The offsets are in tiles and must lie on the entity's edge or inside its collision box:
-    /// Factorio refuses to load a mod whose pipe connection is outside the entity. A 2.4x2.4
-    /// machine, for example, takes <c>PipePort.North(0, -1)</c> and <c>PipePort.South(0, 1)</c>.
+    /// On a 3×3 machine centered on <c>(0, 0)</c>:
+    /// north edge is <c>(0, -1)</c>, south edge is <c>(0, 1)</c>,
+    /// west edge is <c>(-1, 0)</c>, east edge is <c>(1, 0)</c>.
     /// </para>
     /// </summary>
     public sealed class PipePort : ILuaValue
@@ -23,38 +27,23 @@ namespace Factorio.Data
             _y = y;
         }
 
-        /// <summary>A connection on the north edge.</summary>
-        /// <param name="x">Horizontal offset; 0 is the centre.</param>
-        /// <param name="y">Vertical offset; negative is north.</param>
-        /// <returns>The pipe connection.</returns>
-        public static PipePort North(double x, double y) => new("north", x, y);
+        /// <summary>A pipe leaving the north side of the machine (<c>defines.direction.north</c>).</summary>
+        public static PipePort North(double x = 0, double y = -1) => new("north", x, y);
 
-        /// <summary>A connection on the south edge.</summary>
-        /// <param name="x">Horizontal offset; 0 is the centre.</param>
-        /// <param name="y">Vertical offset; positive is south.</param>
-        /// <returns>The pipe connection.</returns>
-        public static PipePort South(double x, double y) => new("south", x, y);
+        /// <summary>A pipe leaving the east side of the machine (<c>defines.direction.east</c>).</summary>
+        public static PipePort East(double x = 1, double y = 0) => new("east", x, y);
 
-        /// <summary>A connection on the west edge.</summary>
-        /// <param name="x">Horizontal offset; negative is west.</param>
-        /// <param name="y">Vertical offset; 0 is the centre.</param>
-        /// <returns>The pipe connection.</returns>
-        public static PipePort West(double x, double y) => new("west", x, y);
+        /// <summary>A pipe leaving the south side of the machine (<c>defines.direction.south</c>).</summary>
+        public static PipePort South(double x = 0, double y = 1) => new("south", x, y);
 
-        /// <summary>A connection on the east edge.</summary>
-        /// <param name="x">Horizontal offset; positive is east.</param>
-        /// <param name="y">Vertical offset; 0 is the centre.</param>
-        /// <returns>The pipe connection.</returns>
-        public static PipePort East(double x, double y) => new("east", x, y);
+        /// <summary>A pipe leaving the west side of the machine (<c>defines.direction.west</c>).</summary>
+        public static PipePort West(double x = -1, double y = 0) => new("west", x, y);
 
-        /// <summary>Writes <c>{ direction = defines.direction.north, position = { x, y } }</c>.</summary>
-        /// <param name="writer">The writer.</param>
+        /// <summary>Writes <c>{ direction = defines.direction.north, position = { x = ..., y = ... } }</c>.</summary>
         public void Write(LuaWriter writer)
         {
             writer.BeginTable();
             writer.Key("direction");
-            // `defines` exists in the data stage, so the game's own constant is used rather than a
-            // number copied out of the API documents.
             writer.Raw("defines.direction." + _direction);
             writer.Key("position");
             writer.BeginTable();
@@ -65,5 +54,50 @@ namespace Factorio.Data
             writer.EndTable();
             writer.EndTable();
         }
+    }
+
+    /// <summary>
+    /// Strongly-typed collection of <see cref="PipePort"/> entries (<c>[PipePort.East(1, 0)]</c>).
+    /// </summary>
+    [CollectionBuilder(typeof(PipePortList), nameof(Create))]
+    public sealed class PipePortList : ILuaValue, IEnumerable<PipePort>
+    {
+        private readonly List<PipePort> _items = new();
+
+        /// <summary>Builds a list from a C# collection expression <c>[PipePort.North(...), ...]</c>.</summary>
+        public static PipePortList Create(ReadOnlySpan<PipePort> items)
+        {
+            var list = new PipePortList();
+            foreach (var item in items) list._items.Add(item);
+            return list;
+        }
+
+        /// <summary>Allows assigning a legacy <see cref="Values"/> collection seamlessly.</summary>
+        public static implicit operator PipePortList?(Values? values)
+        {
+            if (values == null) return null;
+            var list = new PipePortList();
+            foreach (var item in values)
+            {
+                if (item is PipePort port) list._items.Add(port);
+            }
+            return list;
+        }
+
+        /// <summary>Number of pipe ports.</summary>
+        public int Count => _items.Count;
+
+        /// <inheritdoc />
+        public void Write(LuaWriter writer)
+        {
+            writer.BeginArray();
+            foreach (var item in _items) writer.Value(item);
+            writer.EndArray();
+        }
+
+        /// <inheritdoc />
+        public IEnumerator<PipePort> GetEnumerator() => _items.GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

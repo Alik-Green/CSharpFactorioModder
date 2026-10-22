@@ -1,64 +1,87 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    This project is not a .NET assembly: it is what makes the IDE's Build button build the mod.
+    Rider / Visual Studio / `dotnet run` project file for a Factorio C# mod.
 
-    The C# under src/ is not compiled by the .NET compiler - it is transpiled to control.lua by
-    `factorio-mod build`, and the point of this toolchain. So `Build` here does two things: it
-    compiles nothing (there are no compile items), and then runs the tool, which turns src/*.cs into
-    control.lua, data/*.cs into data.lua, copies resources/, checks it all and writes the zip.
-
-    So: Build (Ctrl+F9), or Rebuild, produces build/mods/<name>_<version>.zip. Nothing else has to be
-    configured - how the mod is built lives in mod.json, next to the mod.
-
-    Where the tool is, in the order it is looked for:
-      1. -p:FactorioToolCommand="..." (or FactorioToolCommand in Directory.Build.props)
-      2. a checkout: $(FactorioRepo), or the two folders above this one, when it has
-         config/toolchain.json. A mod inside <repo>/mods/ finds the repository by itself.
-      3. `factorio-mod` on PATH, which is what the installer sets up.
+    * All source, data, locale and manifest files appear directly in Solution Explorer.
+    * Full IntelliSense & XML docs come from Factorio.Bindings.dll in the installed toolchain
+      (or directly from src/Factorio.Bindings when building inside a repository checkout).
+    * Build (Ctrl+Shift+B / Ctrl+F9) compiles C#, validates Roslyn & prototype rules, and packages
+      build/mods/<name>_<version>.zip.
+    * Run (F5 / Shift+F10) builds the mod and copies the zip straight into Factorio's mods folder
+      (pass `launch` / set FACTORIO_LAUNCH=1 to also launch Factorio).
   -->
 
   <PropertyGroup>
+    <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
+    <RollForward>LatestMajor</RollForward>
+    <StartupObject>__FactorioIdeRunner</StartupObject>
 
-    <!-- No compile items and no assembly: the build's real work is the Exec below. -->
-    <EnableDefaultItems>false</EnableDefaultItems>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <DefaultItemExcludes>$(DefaultItemExcludes);build/**;.idea/**</DefaultItemExcludes>
     <NoWarn>$(NoWarn);CS1591;CS2008</NoWarn>
 
     <FactorioRepo Condition="'$(FactorioRepo)' == ''">$(FACTORIO_MOD_REPO)</FactorioRepo>
     <FactorioRepo Condition="'$(FactorioRepo)' == ''">$(MSBuildThisFileDirectory)..\..</FactorioRepo>
+
+    <_FactorioRegHkcu Condition="$([MSBuild]::IsOSPlatform('Windows'))">$([MSBuild]::GetRegistryValueFromView('HKEY_CURRENT_USER\Software\FactorioCSharpModder', 'InstallDir', null, RegistryView.Default))</_FactorioRegHkcu>
+    <_FactorioRegHklm Condition="$([MSBuild]::IsOSPlatform('Windows'))">$([MSBuild]::GetRegistryValueFromView('HKEY_LOCAL_MACHINE\Software\FactorioCSharpModder', 'InstallDir', null, RegistryView.Registry64, RegistryView.Default))</_FactorioRegHklm>
+
+    <FactorioHome Condition="'$(FactorioHome)' == '' AND Exists('$(FactorioRepo)/config/toolchain.json')">$(FactorioRepo)</FactorioHome>
+    <FactorioHome Condition="'$(FactorioHome)' == '' AND '$(FACTORIO_MOD_HOME)' != '' AND Exists('$(FACTORIO_MOD_HOME)/config/toolchain.json')">$(FACTORIO_MOD_HOME)</FactorioHome>
+    <FactorioHome Condition="'$(FactorioHome)' == '' AND '$(_FactorioRegHkcu)' != '' AND Exists('$(_FactorioRegHkcu)/config/toolchain.json')">$(_FactorioRegHkcu)</FactorioHome>
+    <FactorioHome Condition="'$(FactorioHome)' == '' AND '$(_FactorioRegHklm)' != '' AND Exists('$(_FactorioRegHklm)/config/toolchain.json')">$(_FactorioRegHklm)</FactorioHome>
+    <FactorioHome Condition="'$(FactorioHome)' == '' AND $([MSBuild]::IsOSPlatform('Windows')) AND Exists('$(LocalAppData)/Programs/Factorio C# Modder/config/toolchain.json')">$(LocalAppData)\Programs\Factorio C# Modder</FactorioHome>
+    <FactorioHome Condition="'$(FactorioHome)' == '' AND $([MSBuild]::IsOSPlatform('Windows')) AND Exists('$(ProgramFiles)/Factorio C# Modder/config/toolchain.json')">$(ProgramFiles)\Factorio C# Modder</FactorioHome>
+    <FactorioHome Condition="'$(FactorioHome)' == '' AND !$([MSBuild]::IsOSPlatform('Windows')) AND Exists('$(HOME)/.local/share/factorio-mod/config/toolchain.json')">$(HOME)/.local/share/factorio-mod</FactorioHome>
   </PropertyGroup>
 
   <PropertyGroup>
-    <!-- A checkout: the wrapper on Windows, the built dll everywhere else. -->
     <FactorioToolCommand Condition="'$(FactorioToolCommand)' == '' AND Exists('$(FactorioRepo)/config/toolchain.json') AND $([MSBuild]::IsOSPlatform('Windows'))">"$(FactorioRepo)\factorio-mod.cmd"</FactorioToolCommand>
     <FactorioToolCommand Condition="'$(FactorioToolCommand)' == '' AND Exists('$(FactorioRepo)/config/toolchain.json') AND !$([MSBuild]::IsOSPlatform('Windows'))">dotnet "$(FactorioRepo)/tools/Factorio.ModTool/bin/Release/net8.0/factorio-mod.dll"</FactorioToolCommand>
-
-    <!-- No checkout: the installed tool. -->
+    <FactorioToolCommand Condition="'$(FactorioToolCommand)' == '' AND Exists('$(FactorioHome)/bin/factorio-mod.cmd') AND $([MSBuild]::IsOSPlatform('Windows'))">"$(FactorioHome)\bin\factorio-mod.cmd"</FactorioToolCommand>
+    <FactorioToolCommand Condition="'$(FactorioToolCommand)' == '' AND Exists('$(FactorioHome)/bin/factorio-mod.sh') AND !$([MSBuild]::IsOSPlatform('Windows'))">"$(FactorioHome)/bin/factorio-mod.sh"</FactorioToolCommand>
     <FactorioToolCommand Condition="'$(FactorioToolCommand)' == ''">factorio-mod</FactorioToolCommand>
 
-    <!-- Run from the repository when there is one, so relative build output stays where it belongs. -->
     <FactorioWorkingDirectory Condition="'$(FactorioWorkingDirectory)' == '' AND Exists('$(FactorioRepo)/config/toolchain.json')">$(FactorioRepo)</FactorioWorkingDirectory>
     <FactorioWorkingDirectory Condition="'$(FactorioWorkingDirectory)' == ''">$(MSBuildProjectDirectory)</FactorioWorkingDirectory>
   </PropertyGroup>
 
-  <!--
-    Remarks:
-      * DesignTimeBuild is excluded: the IDE evaluates the project constantly and must not build a
-        mod for that.
-      * Extra flags are additive: pass them as -p:FactorioBuildArguments="no-zip" (a flag is
-        accepted with or without its leading dashes).
-      * The tool reads the rest from mod.json ("build": { ... }), so this command stays short.
-  -->
+  <ItemGroup Condition="Exists('$(FactorioHome)/lib/Factorio.Bindings.dll')">
+    <Reference Include="Factorio.Bindings">
+      <HintPath>$(FactorioHome)/lib/Factorio.Bindings.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup Condition="!Exists('$(FactorioHome)/lib/Factorio.Bindings.dll') AND Exists('$(FactorioHome)/src/Factorio.Bindings/Compat.cs')">
+    <Compile Include="$(FactorioHome)/src/Factorio.Bindings/Compat.cs" Visible="false" />
+    <Compile Include="$(FactorioHome)/src/Factorio.Bindings/Utilities/**/*.cs" Visible="false" />
+    <Compile Include="$(FactorioHome)/src/Factorio.Bindings/Data/**/*.cs" Visible="false" />
+    <Compile Include="$(FactorioHome)/src/Factorio.Bindings/Generated/2.0.72/**/*.cs" Visible="false" />
+  </ItemGroup>
+
+  <Target Name="FactorioGenerateIdeEntry" BeforeTargets="BeforeCompile;CoreCompile">
+    <PropertyGroup>
+      <_FactorioIdeEntryFile>$(IntermediateOutputPath)FactorioIdeRunner.g.cs</_FactorioIdeEntryFile>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(_FactorioIdeEntryFile)"
+                      Lines="public static class __FactorioIdeRunner { public static int Main(string[] args) =&gt; global::Factorio.IdeRunner.Run(args)%3B }"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <Compile Remove="$(_FactorioIdeEntryFile)" />
+      <Compile Include="$(_FactorioIdeEntryFile)" Visible="false" />
+    </ItemGroup>
+  </Target>
+
   <Target Name="FactorioBuild" AfterTargets="Build" Condition="'$(DesignTimeBuild)' != 'true'">
     <Message Importance="high" Text="factorio-mod build $(MSBuildProjectDirectory)" />
     <Message Importance="normal" Condition="!Exists('$(FactorioRepo)/config/toolchain.json')"
-             Text="No checkout at $(FactorioRepo); using factorio-mod from PATH." />
-    <Exec Command="$(FactorioToolCommand) build &quot;$(MSBuildProjectDirectory)&quot; $(FactorioBuildArguments)"
+             Text="No checkout at $(FactorioRepo); using factorio-mod from $(FactorioHome)." />
+    <Exec Command="$(FactorioToolCommand) build &quot;$(MSBuildProjectDirectory)&quot; --format msbuild $(FactorioBuildArguments)"
           WorkingDirectory="$(FactorioWorkingDirectory)" />
   </Target>
 

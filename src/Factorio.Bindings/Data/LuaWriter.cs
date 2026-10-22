@@ -120,6 +120,10 @@ namespace Factorio.Data
 
         private void Open(bool isArray)
         {
+            if (_entries.Count > 0 && IsArrayEntry() && _lineHasContent)
+            {
+                StartEntry();
+            }
             _out.Append('{');
             _lineHasContent = true;
             _entries.Push(0);
@@ -159,6 +163,9 @@ namespace Factorio.Data
                     break;
                 case string text:
                     _out.Append(Quote(text));
+                    break;
+                case PrototypeName named:
+                    _out.Append(Quote(named.Name));
                     break;
                 case bool flag:
                     _out.Append(flag ? "true" : "false");

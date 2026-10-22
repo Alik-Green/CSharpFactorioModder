@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>Factorio.Bindings</AssemblyName>
+    <RootNamespace>Factorio</RootNamespace>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <DebugType>none</DebugType>
+    <NoWarn>$(NoWarn);CS1591;CS1573;CS1574;CS1587;CS0108;CS0114</NoWarn>
+    <BaseIntermediateOutputPath>../../build/obj/Factorio.Bindings/</BaseIntermediateOutputPath>
+    <OutputPath>../../build/bin/Factorio.Bindings/</OutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Compat.cs" />
+    <Compile Include="Utilities/**/*.cs" />
+    <Compile Include="Data/**/*.cs" />
+    <Compile Include="Generated/2.0.72/**/*.cs" />
+  </ItemGroup>
+
+</Project>

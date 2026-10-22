@@ -1,0 +1,238 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 1.2.3)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Build & test Windows installer
+    runs-on: windows-latest
+    timeout-minutes: 25
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine release version
+        id: meta
+        shell: pwsh
+        run: |
+          $ver = "${{ inputs.version }}"
+          if ([string]::IsNullOrWhiteSpace($ver)) {
+            if ("$env:GITHUB_REF" -like "refs/tags/v*") {
+              $ver = "$env:GITHUB_REF" -replace '^refs/tags/v',''
+            } else {
+              $ver = "1.0.5"
+            }
+          }
+          $ver = $ver.TrimStart('v')
+          "version=$ver" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Ensure Inno Setup 6 and Lua compiler are installed
+        shell: pwsh
+        run: |
+          $iscc86 = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          $iscc64 = Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc86) -and -not (Test-Path $iscc64)) {
+            choco install innosetup --no-progress -y
+          }
+          $luaDir = Join-Path $env:RUNNER_TEMP 'lua52'
+          New-Item -ItemType Directory -Force -Path $luaDir | Out-Null
+          choco install lua --no-progress -y
+          $luacExe = Get-ChildItem -Path 'C:\ProgramData\chocolatey','C:\Program Files (x86)\Lua','C:\Program Files\Lua' -Filter 'luac*.exe' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          Copy-Item $luacExe.FullName (Join-Path $luaDir 'luac.exe') -Force
+          "$luaDir" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          & (Join-Path $luaDir 'luac.exe') -v
+
+      - name: Bootstrap compiler, run tests, and build Windows installer (.exe)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          function Run-Logged([string]$Label, [scriptblock]$Block) {
+            $out = & $Block 2>&1 | Out-String
+            $code = $LASTEXITCODE
+            Write-Host $out
+            if ($code -ne 0) {
+              $lines = ($out -split "`r?`n") | Select-Object -Last 60
+              $msg = (($lines -join "`n") -replace '%','%25' -replace "`r",'%0D' -replace "`n",'%0A')
+              Write-Output "::error::Windows step failed ($Label):%0A$msg"
+              exit $code
+            }
+          }
+          Run-Logged "bootstrap" { cmd /c "factorio-mod.cmd bootstrap" }
+          Run-Logged "Generator.Tests" { dotnet test tests\Generator.Tests -c Release --nologo }
+          Run-Logged "Transpile.Tests" { dotnet test tests\Transpile.Tests -c Release --nologo }
+          Run-Logged "Analyzer.Tests" { dotnet test tests\Analyzer.Tests -c Release --nologo }
+          Run-Logged "dotnet build HelloFactorio" { dotnet build mods\HelloFactorio\HelloFactorio.csproj -c Release --nologo -p:WarningLevel=0 }
+          Run-Logged "dotnet build DemoChemistry" { dotnet build mods\DemoChemistry\DemoChemistry.csproj -c Release --nologo -p:WarningLevel=0 }
+          Run-Logged "dotnet build GasExtractor" { dotnet build mods\GasExtractor\GasExtractor.csproj -c Release --nologo -p:WarningLevel=0 }
+          Run-Logged "installer/build.cmd" { cmd /c "installer\build.cmd ${{ steps.meta.outputs.version }}" }
+
+      - name: Smoke-test Rider Run button & IntelliSense DLL on isolated .NET 10 SDK
+        shell: pwsh
+        run: |
+          try {
+            $ver = "${{ steps.meta.outputs.version }}"
+            $installer = Resolve-Path "release\FactorioCSharpModder-$ver-win64.exe"
+            $installDir = Join-Path $env:RUNNER_TEMP "FactorioCSharpModderInstall"
+            $smokeDir = Join-Path $env:RUNNER_TEMP "FactorioSmoke"
+            New-Item -ItemType Directory -Force -Path $smokeDir | Out-Null
+
+            # Create fake %APPDATA%\Factorio directory so IdeRunner deploys the built zip automatically
+            $factorioAppData = Join-Path $env:APPDATA "Factorio"
+            New-Item -ItemType Directory -Force -Path $factorioAppData | Out-Null
+
+            # Install isolated .NET 10 SDK with NO .NET 8 runtime (mirrors JetBrains Rider ~/.dotnet)
+            $dotnet10Dir = Join-Path $env:RUNNER_TEMP "dotnet10"
+            $installScript = Join-Path $env:RUNNER_TEMP "dotnet-install.ps1"
+            Invoke-WebRequest -Uri "https://builds.dotnet.microsoft.com/dotnet/scripts/v1/dotnet-install.ps1" -OutFile $installScript
+            & $installScript -Channel 10.0 -InstallDir $dotnet10Dir -NoPath
+
+            # Deliberately do NOT put $installDir\bin on PATH or set FACTORIO_MOD_HOME,
+            # proving even an already-open Rider window finds Factorio.Bindings.dll & factorio-mod via Registry!
+            $env:DOTNET_ROOT = $dotnet10Dir
+            $env:DOTNET_MULTILEVEL_LOOKUP = "0"
+            Remove-Item Env:DOTNET_ROLL_FORWARD -ErrorAction SilentlyContinue
+            Remove-Item Env:FACTORIO_MOD_HOME -ErrorAction SilentlyContinue
+            $env:PATH = "$dotnet10Dir;$env:PATH"
+
+            $proc = Start-Process -FilePath $installer.Path -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/TEMPLATE', "/DIR=$installDir") -Wait -PassThru
+            if ($proc.ExitCode -ne 0) { throw "Installer exited with code $($proc.ExitCode)" }
+
+            if (-not (Test-Path "$installDir\lib\Factorio.Bindings.dll")) { throw "Missing lib\Factorio.Bindings.dll" }
+            if (-not (Test-Path "$installDir\lib\Factorio.Bindings.xml")) { throw "Missing lib\Factorio.Bindings.xml" }
+
+            Push-Location $smokeDir
+            try {
+              & "$dotnet10Dir\dotnet.exe" new factorio-mod -n GreenMod -o "$smokeDir\GreenMod"
+              if ($LASTEXITCODE -ne 0) { throw "dotnet new factorio-mod failed under .NET 10" }
+
+              # Add real 146x149 PNG + strongly-typed AtmosphericCondenser data stage to GreenMod
+              $pngDir = "$smokeDir\GreenMod\resources\graphics\entity"
+              New-Item -ItemType Directory -Force -Path $pngDir | Out-Null
+              [byte[]]$png = 0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A,0,0,0,13,0x49,0x48,0x44,0x52,0,0,0,146,0,0,0,149
+              [System.IO.File]::WriteAllBytes("$pngDir\atmospheric-condenser.png", $png)
+
+              $codeLines = @(
+                'using Factorio.Data;'
+                'namespace GreenMod;'
+                'public sealed class ExampleMod : ModDefinition'
+                '{'
+                '    public override void Define(ModBuilder mod)'
+                '    {'
+                '        mod.Add('
+                '            new BoolSettingDefinition("greenmod-turbo", defaultValue: true) { LocalisedName = "Turbo mode" },'
+                '            new CondenserMachine(),'
+                '            new CondenserTech());'
+                '    }'
+                '}'
+                'public sealed class CondenserMachine : AssemblingMachineDefinition'
+                '{'
+                '    public CondenserMachine() : base("atmospheric-condenser")'
+                '    {'
+                '        LocalisedName = "Atmospheric Condenser";'
+                '        Icon = Asset.Mod("graphics/entity/atmospheric-condenser.png");'
+                '        Corpse = Vanilla.Entities.MediumRemnants;'
+                '        SetSize(2, 3);'
+                '        Graphics = GraphicsSet.Auto(Asset.Mod("graphics/entity/atmospheric-condenser.png"), tilesWide: 2, tilesHigh: 3).Shift(0, -0.15).ScaleBy(1.05);'
+                '        CraftingCategories = [CraftingCategory.Chemistry];'
+                '        CraftingSpeed = 1.0;'
+                '        EnergyUsage = Energy.Kilowatts(180);'
+                '        EnergySource = EnergySource.Electric();'
+                '        FluidBoxes = [FluidBox.Output(Vanilla.Fluids.Water, 100, [PipePort.East(0.5, 0)])];'
+                '        Craftable('
+                '            ingredients: ['
+                '                Ingredient.Item(Vanilla.Items.ElectronicCircuit, 5),'
+                '                Vanilla.Items.IronPlate * 10,'
+                '                Vanilla.Machines.Pump * 1,'
+                '            ],'
+                '            stackSize: 10,'
+                '            subgroup: Subgroup.ExtractionMachine,'
+                '            energyRequired: 2,'
+                '            enabled: false);'
+                '    }'
+                '}'
+                'public sealed class CondenserTech : TechnologyDefinition'
+                '{'
+                '    public CondenserTech() : base("atmospheric-condensation")'
+                '    {'
+                '        LocalisedName = "Atmospheric Condensation";'
+                '        Icon = Vanilla.Icons.Technologies.FluidHandling;'
+                '        Prerequisites = [Vanilla.Technologies.FluidHandling, Vanilla.Technologies.Electronics];'
+                '        Effects = [TechEffect.UnlockRecipe("atmospheric-condenser")];'
+                '        Count = 100;'
+                '        Time = 30;'
+                '        SciencePacks = [SciencePack.Automation, SciencePack.Logistic];'
+                '    }'
+                '}'
+              )
+              [System.IO.File]::WriteAllLines("$smokeDir\GreenMod\data\ExampleMod.cs", $codeLines)
+
+              # Exact command Rider runs when pressing the green Run button:
+              $ErrorActionPreference = 'Continue'
+              $runOut = & "$dotnet10Dir\dotnet.exe" run --project "$smokeDir\GreenMod\GreenMod.csproj" 2>&1 | Out-String
+              $runCode = $LASTEXITCODE
+              Write-Host $runOut
+              if ($runCode -ne 0) { throw "dotnet run GreenMod.csproj failed ($runCode):`n$runOut" }
+
+              $builtZip = "$smokeDir\GreenMod\build\mods\GreenMod_0.1.0.zip"
+              $deployedZip = "$factorioAppData\mods\GreenMod_0.1.0.zip"
+              if (-not (Test-Path $builtZip)) { throw "Expected built zip not found: $builtZip" }
+              if (-not (Test-Path $deployedZip)) { throw "Expected deployed zip in Factorio mods dir not found: $deployedZip" }
+
+              Expand-Archive -Path $deployedZip -DestinationPath "$smokeDir\unzipped" -Force
+              $dataLua = Get-Content "$smokeDir\unzipped\GreenMod_0.1.0\data.lua" -Raw
+              if ($dataLua -notmatch 'width = 146' -or $dataLua -notmatch 'height = 149' -or $dataLua -notmatch 'icon_size = 146' -or $dataLua -notmatch 'electronic-circuit') {
+                throw "Expected v1.0.4 generated fields missing from data.lua:`n$dataLua"
+              }
+              if (-not (Test-Path "$smokeDir\unzipped\GreenMod_0.1.0\settings.lua")) {
+                throw "Expected generated settings.lua missing from zip"
+              }
+            } finally {
+              Pop-Location
+            }
+          } catch {
+            $msg = $_.Exception.ToString() -replace '%','%25' -replace "`r",'%0D' -replace "`n",'%0A'
+            Write-Output "::error::Windows smoke test failed:%0A$msg"
+            throw
+          }
+
+      - name: Upload Windows installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: release/*.exe
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.meta.outputs.version }}"
+          $tag = "v$ver"
+          $exe = "release\FactorioCSharpModder-$ver-win64.exe"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $exe --clobber
+          } else {
+            gh release create $tag $exe --target "${env:GITHUB_SHA}" --title "Factorio C# Modder $ver" --generate-notes
+          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

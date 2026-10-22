@@ -34,16 +34,23 @@ namespace Factorio.Data
         public string Name => (string)Get("name")!;
 
         /// <summary>
-        /// The prototype's icon: <c>Asset.Base("graphics/icons/iron-plate.png")</c>, or a sprite
-        /// table for an icon a build step rendered.
+        /// The prototype's icon: e.g. <c>Asset.Mod("graphics/icons/condenser.png")</c>,
+        /// <c>IconSpec.Mod("graphics/icons/condenser.png")</c>, or <c>Asset.Base("graphics/icons/iron-plate.png")</c>.
+        /// <para>
+        /// When pointing to a PNG file inside <c>resources/</c>, <see cref="IconSize"/> is automatically
+        /// fitted to the PNG's actual pixel dimensions even if <see cref="IconSize"/> was omitted or mismatched!
+        /// </para>
         /// </summary>
-        public object? Icon
+        public IconSpec? Icon
         {
-            get => Get("icon");
+            get => Get("icon") as IconSpec;
             set => Set("icon", value);
         }
 
-        /// <summary>Size of <see cref="Icon"/> in pixels. Factorio wants this with a plain path icon.</summary>
+        /// <summary>
+        /// Size of <see cref="Icon"/> in pixels. Optional when using <c>Asset.Mod("...")</c> —
+        /// the build inspects the PNG automatically!
+        /// </summary>
         public double IconSize
         {
             get => Number("icon_size");
@@ -51,13 +58,18 @@ namespace Factorio.Data
         }
 
         /// <summary>
-        /// The name the player sees, e.g. <c>"Chemical assembler"</c>.
+        /// Composite multi-layer icons (e.g. <c>[IconLayer.Tinted(Vanilla.Icons.Machines.ChemicalPlant, Rgb.Hex("#38BDF8")), IconLayer.Badge(Vanilla.Icons.Fluids.Water)]</c>).
+        /// </summary>
+        public IconLayerList? Icons
+        {
+            get => Get("icons") as IconLayerList;
+            set => Set("icons", value);
+        }
+
+        /// <summary>
+        /// The name the player sees, e.g. <c>"Atmospheric Condenser"</c>.
         /// <para>
-        /// A definition writes a localisation entry into the generated <c>data.lua</c>, merged into
-        /// <c>locale/en/locale.cfg</c> at build time, so the name cannot drift from the prototype it
-        /// belongs to and cannot be forgotten: the build warns about any visible prototype that has
-        /// no name at all. Languages other than English go in the mod's own locale files, which are
-        /// merged rather than replaced.
+        /// Merged automatically into <c>locale/en/locale.cfg</c> at build time.
         /// </para>
         /// </summary>
         public string? LocalisedName
@@ -67,8 +79,7 @@ namespace Factorio.Data
         }
 
         /// <summary>
-        /// One line of tooltip text, from the same localisation entry as
-        /// <see cref="LocalisedName"/>.
+        /// One line of tooltip text shown under <see cref="LocalisedName"/>.
         /// </summary>
         public string? LocalisedDescription
         {
@@ -77,7 +88,6 @@ namespace Factorio.Data
         }
 
         /// <summary>Hides the prototype from the player's lists; recipes can still use it.</summary>
-
         public bool Hidden
         {
             get => Flag("hidden");
@@ -85,13 +95,8 @@ namespace Factorio.Data
         }
 
         /// <summary>
-        /// Sort order inside the crafting menu or the prototype list:
-        /// <c>SortOrder.At("b", "demo-chemical-assembler")</c> writes <c>b[demo-chemical-assembler]</c>.
-        /// <para>
-        /// Leave it unset and the prototype sorts by name, which is usually fine - but a machine
-        /// dropped into a tab full of vanilla machines reads better with a letter that puts it where
-        /// the player expects it.
-        /// </para>
+        /// Sort order inside the crafting menu or prototype list:
+        /// <c>SortOrder.At("b", "atmospheric-condenser")</c> writes <c>b[atmospheric-condenser]</c>.
         /// </summary>
         public SortOrder? Order
         {
@@ -100,8 +105,8 @@ namespace Factorio.Data
         }
 
         /// <summary>
-        /// The tab the prototype appears in: <c>Subgroup.ProductionMachine</c>, or a name of a tab
-        /// this mod declares. An item with no subgroup lands in the game's "Other" tab.
+        /// The tab/row the prototype appears in: e.g. <c>Subgroup.ProductionMachine</c>,
+        /// <c>Subgroup.ExtractionMachine</c>, or a custom <see cref="SubgroupDefinition"/>.
         /// </summary>
         public Subgroup? Subgroup
         {
@@ -109,49 +114,50 @@ namespace Factorio.Data
             set => Set("subgroup", value);
         }
 
-        /// <summary>
-        /// The vanilla prototype this definition takes its unset fields from, or <c>null</c>.
-        /// <para>
-        /// Read by the toolchain: those values are copied when the data stage runs, so this is a
-        /// relationship between prototypes rather than a field of this one.
-        /// </para>
-        /// </summary>
+        /// <summary>The vanilla prototype this definition takes its unset fields from, or <c>null</c>.</summary>
         public VanillaPrototype? InheritsFrom => Get("__inherit") as VanillaPrototype;
 
-        /// <summary>
-        /// Sets any prototype field by name, including ones this API does not model yet.
-        /// <para>
-        /// The escape hatch for a property that has no typed wrapper: the key is written as given,
-        /// so <c>Field("emissions_per_minute", ...)</c> is the same as writing that field in
-        /// <c>data.lua</c> by hand.
-        /// </para>
-        /// </summary>
-        /// <param name="name">Lua field name.</param>
-        /// <param name="value">The value; <c>null</c> means "not this field" for an inherited prototype.</param>
+        /// <summary>Sets any prototype field by raw Lua field name.</summary>
         public void Field(string name, object? value) => Set(name, value);
 
-        /// <summary>
-        /// Copies <paramref name="donor"/>'s field into this definition, for inheritance.
-        /// </summary>
-        /// <param name="donor">A definition whose field should be reused.</param>
-        /// <param name="name">Field name.</param>
+        /// <summary>Copies <paramref name="donor"/>'s field into this definition, for inheritance.</summary>
         public void CopyFieldFrom(PrototypeDefinition donor, string name) => Set(name, donor.Get(name));
 
-        /// <summary>Writes the prototype table. Called by the toolchain, not by a mod.</summary>
-        /// <param name="writer">The writer collecting the Lua.</param>
+        /// <summary>Writes the prototype table. Automatically sizes <c>icon_size</c> when a mod PNG exists on disk.</summary>
         public virtual void Write(LuaWriter writer)
         {
+            int? autoIconSize = null;
+            if (Get("icon") is IconSpec iconSpec && !string.IsNullOrEmpty(iconSpec.Path))
+            {
+                if (Asset.TryReadModPngSize(iconSpec.Path, out var pngW, out var pngH))
+                    autoIconSize = Math.Min(pngW, pngH);
+                else if (iconSpec.Path.StartsWith("__base__/graphics/technology/", StringComparison.Ordinal) ||
+                         iconSpec.Path.StartsWith("__space-age__/graphics/technology/", StringComparison.Ordinal))
+                    autoIconSize = 256;
+            }
+
             writer.BeginTable();
             foreach (var field in _fields)
+            {
+                if (field.Key == "icon_size" && autoIconSize.HasValue)
+                {
+                    WriteField(writer, field.Key, autoIconSize.Value);
+                    autoIconSize = null;
+                    continue;
+                }
                 WriteField(writer, field.Key, field.Value);
+            }
+
+            if (autoIconSize.HasValue)
+            {
+                WriteField(writer, "icon_size", autoIconSize.Value);
+            }
+
             WriteClearedFields(writer);
             writer.EndTable();
         }
 
         /// <summary>Writes one field; overridden to change a spelling for a version.</summary>
-        /// <param name="writer">The writer.</param>
-        /// <param name="name">Field name as C# declared it.</param>
-        /// <param name="value">The value; null for "cleared".</param>
         protected virtual void WriteField(LuaWriter writer, string name, object? value)
         {
             if (value == null || value is LocalisedText) return;
@@ -160,8 +166,6 @@ namespace Factorio.Data
         }
 
         /// <summary>Reads a field that was assigned, if any.</summary>
-        /// <param name="name">Field name.</param>
-        /// <returns>The value, or null.</returns>
         protected object? Get(string name)
         {
             foreach (var field in _fields)
@@ -170,11 +174,8 @@ namespace Factorio.Data
         }
 
         /// <summary>Assigns a field, keeping the order fields were first written in.</summary>
-        /// <param name="name">Field name.</param>
-        /// <param name="value">The value, or null for "cleared".</param>
         protected void Set(string name, object? value)
         {
-            // A named value is a string with a type; the prototype table only wants the string.
             if (value is PrototypeName prototypeName) value = prototypeName.Name;
 
             for (var i = 0; i < _fields.Count; i++)
@@ -187,8 +188,6 @@ namespace Factorio.Data
         }
 
         /// <summary>Reads a numeric field, 0 when it was never assigned.</summary>
-        /// <param name="name">Field name.</param>
-        /// <returns>The number.</returns>
         protected double Number(string name)
         {
             var value = Get(name);
@@ -196,14 +195,9 @@ namespace Factorio.Data
         }
 
         /// <summary>Reads a boolean field, false when it was never assigned.</summary>
-        /// <param name="name">Field name.</param>
-        /// <returns>The flag.</returns>
         protected bool Flag(string name) => Get(name) is true;
 
-        /// <summary>
-        /// The localisation entries this definition declares, keyed by the
-        /// <c>kind/name</c> the build writes them under. Read by the toolchain.
-        /// </summary>
+        /// <summary>The localisation entries this definition declares.</summary>
         public IReadOnlyDictionary<string, string> Localisations
         {
             get
@@ -218,28 +212,17 @@ namespace Factorio.Data
             }
         }
 
-        /// <summary>Reads a declared localisation entry.</summary>
-        /// <param name="kind">The entry kind, <c>localised-name</c> or <c>localised-description</c>.</param>
-        /// <returns>The text, or null.</returns>
         private string? Localise(string kind) =>
             _fields.FirstOrDefault(f => f.Value is LocalisedText text && text.Kind == kind).Value is LocalisedText found
                 ? found.Value
                 : null;
 
-        /// <summary>Declares a localisation entry.</summary>
-        /// <param name="kind">The entry kind, <c>localised-name</c> or <c>localised-description</c>.</param>
-        /// <param name="value">The English text.</param>
         private void SetLocalised(string kind, string? value)
         {
             if (value == null) return;
             Set(kind, new LocalisedText(kind, Name, value));
         }
 
-        /// <summary>
-        /// English text a definition declares about itself rather than a prototype field: it is
-        /// written to the packaged <c>locale.cfg</c>, not into the prototype table, because the game
-        /// reads a prototype's name from localisation, never from the data stage.
-        /// </summary>
         private sealed class LocalisedText
         {
             public LocalisedText(string kind, string key, string value)
@@ -250,19 +233,10 @@ namespace Factorio.Data
             }
 
             public string Kind { get; }
-
             public string Key { get; }
-
             public string Value { get; }
         }
 
-        /// <summary>
-        /// Records the fields that were explicitly set to <c>null</c>. A prototype that inherits
-        /// from a vanilla one copies every field it did not mention, so "not this field" has to be
-        /// written down somewhere: it goes into <c>__nil</c>, which the data stage removes before
-        /// the prototype reaches the game.
-        /// </summary>
-        /// <param name="writer">The writer.</param>
         private void WriteClearedFields(LuaWriter writer)
         {
             var cleared = _fields.Where(f => f.Value == null).Select(f => f.Key).ToList();

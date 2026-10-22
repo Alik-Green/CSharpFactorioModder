@@ -1,29 +1,46 @@
 using System;
+using System.Collections.Generic;
 
 namespace Factorio.Data
 {
+    /// <summary>Module effect types supported by a machine's <see cref="AssemblingMachineDefinition.AllowedEffects"/>.</summary>
+    [Flags]
+    public enum EffectType
+    {
+        /// <summary>No module effects set (use inherited defaults).</summary>
+        None = 0,
+        /// <summary>Speed modules / beacons.</summary>
+        Speed = 1 << 0,
+        /// <summary>Productivity modules.</summary>
+        Productivity = 1 << 1,
+        /// <summary>Efficiency (power consumption) modules.</summary>
+        Consumption = 1 << 2,
+        /// <summary>Pollution-modifying modules.</summary>
+        Pollution = 1 << 3,
+        /// <summary>Quality modules (Factorio 2.0+).</summary>
+        Quality = 1 << 4,
+        /// <summary>All standard module effects.</summary>
+        All = Speed | Productivity | Consumption | Pollution | Quality,
+    }
+
     /// <summary>
     /// A machine that turns recipes into items or fluids - the entity behind an assembling machine,
-    /// a chemical plant, an oil refinery or a centrifuge.
-    /// <para>
-    /// The recipe categories it can run are what makes it a chemical plant rather than an
-    /// assembling machine: a recipe is only craftable in a machine that lists one of the recipe's
-    /// categories. Building on a vanilla prototype (see <see cref="Vanilla"/>) inherits that
-    /// prototype's graphics, collision box and energy source, which is the quickest way to a working
-    /// machine - give it an icon, a category, a speed and fluid boxes, and it runs.
-    /// </para>
+    /// a chemical plant, an oil refinery, a centrifuge, or an atmospheric condenser.
     /// <code>
-    /// public sealed class ChemicalAssembler : AssemblingMachineDefinition
+    /// public sealed class AtmosphericCondenser : AssemblingMachineDefinition
     /// {
-    ///     public ChemicalAssembler()
-    ///         : base("demo-chemical-assembler", Vanilla.AssemblingMachine1)
+    ///     public AtmosphericCondenser() : base("atmospheric-condenser")
     ///     {
-    ///         Icon = Asset.Base("graphics/icons/assembling-machine-1.png");
-    ///         IconSize = 64;
-    ///         CraftingCategories = ["chemistry"];
-    ///         CraftingSpeed = 1.25;
-    ///         EnergyUsage = Energy.Kilowatts(250);
-    ///         MinableResult = ItemRef.Of("demo-chemical-assembler");
+    ///         Icon = Asset.Mod("graphics/entity/atmospheric-condenser.png");
+    ///         CollisionBox = BoundingBox.Collision(3, 3);
+    ///         SelectionBox = BoundingBox.Selection(3, 3);
+    ///         Graphics = GraphicsSet.Auto(Asset.Mod("graphics/entity/atmospheric-condenser.png"), tiles: 3);
+    ///         CraftingCategories = [CraftingCategory.Chemistry];
+    ///         CraftingSpeed = 1.0;
+    ///         EnergyUsage = Energy.Kilowatts(180);
+    ///         EnergySource = EnergySource.Electric();
+    ///         FluidBoxes = [FluidBox.Output(FluidId.Water, 100, [PipePort.East(1, 0)])];
+    ///         MinableResult = "atmospheric-condenser";
     ///     }
     /// }
     /// </code>
@@ -38,12 +55,11 @@ namespace Factorio.Data
         }
 
         /// <summary>
-        /// Declares an assembling machine that starts from an existing one: every field this
-        /// definition does not set is copied from <paramref name="inheritFrom"/> when the data
-        /// stage runs.
+        /// Declares an assembling machine that starts from an existing vanilla machine: every field
+        /// this definition does not set is copied from <paramref name="inheritFrom"/>.
         /// </summary>
         /// <param name="name">Entity prototype name.</param>
-        /// <param name="inheritFrom">The prototype to build on, e.g. <see cref="Vanilla.AssemblingMachine1"/>.</param>
+        /// <param name="inheritFrom">The prototype to build on, e.g. <see cref="Vanilla.ChemicalPlant"/>.</param>
         public AssemblingMachineDefinition(string name, VanillaPrototype inheritFrom)
             : base("assembling-machine", name)
         {
@@ -52,16 +68,11 @@ namespace Factorio.Data
 
         /// <summary>
         /// The recipe categories this machine can craft:
-        /// <c>[CraftingCategory.Chemistry, CraftingCategory.Of("my-category")]</c>.
-        /// <para>
-        /// A recipe is only craftable in a machine that lists one of the recipe's categories, so a
-        /// custom category is how a machine is kept to its own recipes. The build checks that every
-        /// category names a <c>recipe-category</c> that exists.
-        /// </para>
+        /// e.g. <c>[CraftingCategory.Chemistry, CraftingCategory.Of("atmospheric")]</c>.
         /// </summary>
-        public Values? CraftingCategories
+        public CategoryList? CraftingCategories
         {
-            get => Get("crafting_categories") as Values;
+            get => Get("crafting_categories") as CategoryList;
             set => Set("crafting_categories", value);
         }
 
@@ -73,86 +84,94 @@ namespace Factorio.Data
         }
 
         /// <summary>Power draw while crafting, e.g. <c>Energy.Kilowatts(250)</c>.</summary>
-        public string? EnergyUsage
+        public EnergyValue? EnergyUsage
         {
             get => Get("energy_usage") as string;
-            set => Set("energy_usage", value);
+            set => Set("energy_usage", value?.Formatted);
         }
 
         /// <summary>
-        /// What the machine looks like: <c>GraphicsSet.Of("sprite.png", 192, 192, 0.5)</c>.
-        /// <para>
-        /// Leave it unset when building on a vanilla machine - the vanilla graphics are inherited -
-        /// and set it for a machine built from scratch, which the game refuses to load without
-        /// graphics of some kind.
-        /// </para>
+        /// Optional fixed recipe name — when set, the machine automatically runs this recipe as soon
+        /// as placed without requiring the player to open the machine GUI and select a recipe!
         /// </summary>
-        public ILuaValue? Graphics
+        public RecipeId? FixedRecipe
         {
-            get => Get("graphics_set") as ILuaValue;
+            get => Get("fixed_recipe") as string;
+            set => Set("fixed_recipe", value?.Name);
+        }
+
+        /// <summary>
+        /// What the machine looks like on the map:
+        /// e.g. <c>GraphicsSet.Auto(Asset.Mod("graphics/entity/condenser.png"), tiles: 3)</c>.
+        /// </summary>
+        public GraphicsSet? Graphics
+        {
+            get => Get("graphics_set") as GraphicsSet;
             set => Set("graphics_set", value);
         }
 
         /// <summary>
-        /// The energy source. Leave it unset when building on a vanilla machine (it is inherited);
-        /// use <see cref="Electric"/> or <see cref="Burner"/> for a machine built from scratch.
+        /// Power source feeding the machine — e.g. <see cref="EnergySource.Electric"/>,
+        /// <see cref="EnergySource.Burner"/>, <see cref="EnergySource.Void"/>, or <see cref="Electric"/>.
         /// </summary>
-        public object? EnergySource
+        public EnergySource? EnergySource
         {
-            get => Get("energy_source");
+            get => Get("energy_source") as EnergySource;
             set => Set("energy_source", value);
         }
 
-        /// <summary>The machine's fluid boxes, e.g. <c>[FluidBox.Input(...)]</c>.</summary>
-        public Values? FluidBoxes
+        /// <summary>The machine's fluid boxes, e.g. <c>[FluidBox.Output(FluidId.Water, 100, [PipePort.East()])]</c>.</summary>
+        public FluidBoxList? FluidBoxes
         {
-            get => Get("fluid_boxes") as Values;
+            get => Get("fluid_boxes") as FluidBoxList;
             set => Set("fluid_boxes", value);
         }
 
-
-
-        /// <summary>Whether an open machine window shows the recipe's ingredients.</summary>
+        /// <summary>Whether the machine draws the current recipe icon overlay (alt-mode).</summary>
         public bool ShowRecipeIcon
         {
             get => Flag("show_recipe_icon");
             set => Set("show_recipe_icon", value);
         }
 
-        /// <summary>An electric energy source using the usual secondary-input priority.</summary>
-        /// <returns>The <c>energy_source</c> table.</returns>
-        public static ILuaValue Electric() => new EnergySourceTable(new[]
+        /// <summary>Number of module slots inside the machine.</summary>
+        public int ModuleSlots
         {
-            new System.Collections.Generic.KeyValuePair<string, object?>("type", "electric"),
-            new System.Collections.Generic.KeyValuePair<string, object?>("usage_priority", "secondary-input"),
-        });
+            get => (int)Number("module_slots");
+            set => Set("module_slots", value);
+        }
 
-        /// <summary>A burner energy source, for a machine that runs on chemical fuel.</summary>
-        /// <param name="effectivity">How much of the fuel's energy it uses; 1 is normal.</param>
-        /// <returns>The <c>energy_source</c> table.</returns>
-        public static ILuaValue Burner(double effectivity) => new EnergySourceTable(new[]
+        /// <summary>Module effect types accepted by this machine (e.g. <c>EffectType.All</c>).</summary>
+        public EffectType AllowedEffects
         {
-            new System.Collections.Generic.KeyValuePair<string, object?>("type", "burner"),
-            new System.Collections.Generic.KeyValuePair<string, object?>("effectivity", effectivity),
-            new System.Collections.Generic.KeyValuePair<string, object?>("fuel_categories", Values.Of("chemical")),
-        });
+            get => Get("allowed_effects") is EffectTypeEffects e ? e.Flags : EffectType.None;
+            set => Set("allowed_effects", value == EffectType.None ? null : new EffectTypeEffects(value));
+        }
 
-        /// <summary>An energy source table, so <see cref="Electric"/> and <see cref="Burner"/> stay one-liners.</summary>
-        private sealed class EnergySourceTable : ILuaValue
+        /// <summary>An electric energy source using the standard <c>secondary-input</c> priority.</summary>
+        public static EnergySource Electric() => Data.EnergySource.Electric();
+
+        /// <summary>A burner energy source running on chemical fuel.</summary>
+        public static EnergySource Burner(double effectivity = 1.0) => Data.EnergySource.Burner(effectivity);
+
+        private sealed class EffectTypeEffects : ILuaValue
         {
-            private readonly System.Collections.Generic.KeyValuePair<string, object?>[] _fields;
+            public EffectType Flags { get; }
 
-            public EnergySourceTable(System.Collections.Generic.KeyValuePair<string, object?>[] fields) => _fields = fields;
+            public EffectTypeEffects(EffectType flags) => Flags = flags;
 
             public void Write(LuaWriter writer)
             {
-                writer.BeginTable();
-                foreach (var field in _fields)
-                {
-                    writer.Key(field.Key);
-                    writer.Value(field.Value);
-                }
-                writer.EndTable();
+                var names = new List<string>();
+                if ((Flags & EffectType.Speed) != 0) names.Add("speed");
+                if ((Flags & EffectType.Productivity) != 0) names.Add("productivity");
+                if ((Flags & EffectType.Consumption) != 0) names.Add("consumption");
+                if ((Flags & EffectType.Pollution) != 0) names.Add("pollution");
+                if ((Flags & EffectType.Quality) != 0) names.Add("quality");
+
+                writer.BeginArray();
+                foreach (var n in names) writer.Value(n);
+                writer.EndArray();
             }
         }
     }
