@@ -37,6 +37,7 @@ public static class LocaleCheck
             "technology" => "technology-name",
             "item-group" => "item-group-name",
             "equipment-grid" => "equipment-name",
+            "bool-setting" or "int-setting" or "double-setting" or "string-setting" => "mod-setting-name",
             _ => null,
         };
     }

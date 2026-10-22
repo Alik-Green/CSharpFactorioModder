@@ -34,7 +34,8 @@ public static class Packager
         IReadOnlyDictionary<string, string> generatedLocale,
         ToolchainSettings settings,
         bool zip = true,
-        string? outputDirectory = null)
+        string? outputDirectory = null,
+        string? generatedSettingsLua = null)
     {
         var baseOut = outputDirectory ?? DefaultOutputDirectory(settings);
         Directory.CreateDirectory(baseOut);
@@ -84,9 +85,11 @@ public static class Packager
         if (Directory.Exists(generatedSpritesDir))
             CopyTree(generatedSpritesDir, Path.Combine(modDirectory, "generated"));
 
-        // 5. C# generated data.lua
-        if (generatedDataLua != null)
+        // 5. C# generated data.lua & settings.lua
+        if (!string.IsNullOrEmpty(generatedDataLua))
             File.WriteAllText(Path.Combine(modDirectory, "data.lua"), generatedDataLua, utf8NoBom);
+        if (!string.IsNullOrEmpty(generatedSettingsLua))
+            File.WriteAllText(Path.Combine(modDirectory, "settings.lua"), generatedSettingsLua, utf8NoBom);
 
         // 6. Merge C# LocalisedName / LocalisedDescription into locale/en/locale.cfg
         if (generatedLocale.Count > 0)

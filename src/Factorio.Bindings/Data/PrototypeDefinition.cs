@@ -58,6 +58,15 @@ namespace Factorio.Data
         }
 
         /// <summary>
+        /// Composite multi-layer icons (e.g. <c>[IconLayer.Tinted(Vanilla.Icons.Machines.ChemicalPlant, Rgb.Hex("#38BDF8")), IconLayer.Badge(Vanilla.Icons.Fluids.Water)]</c>).
+        /// </summary>
+        public IconLayerList? Icons
+        {
+            get => Get("icons") as IconLayerList;
+            set => Set("icons", value);
+        }
+
+        /// <summary>
         /// The name the player sees, e.g. <c>"Atmospheric Condenser"</c>.
         /// <para>
         /// Merged automatically into <c>locale/en/locale.cfg</c> at build time.
@@ -118,11 +127,13 @@ namespace Factorio.Data
         public virtual void Write(LuaWriter writer)
         {
             int? autoIconSize = null;
-            if (Get("icon") is IconSpec iconSpec &&
-                !string.IsNullOrEmpty(iconSpec.Path) &&
-                Asset.TryReadModPngSize(iconSpec.Path, out var pngW, out var pngH))
+            if (Get("icon") is IconSpec iconSpec && !string.IsNullOrEmpty(iconSpec.Path))
             {
-                autoIconSize = Math.Min(pngW, pngH);
+                if (Asset.TryReadModPngSize(iconSpec.Path, out var pngW, out var pngH))
+                    autoIconSize = Math.Min(pngW, pngH);
+                else if (iconSpec.Path.StartsWith("__base__/graphics/technology/", StringComparison.Ordinal) ||
+                         iconSpec.Path.StartsWith("__space-age__/graphics/technology/", StringComparison.Ordinal))
+                    autoIconSize = 256;
             }
 
             writer.BeginTable();

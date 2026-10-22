@@ -192,11 +192,17 @@ namespace Factorio.Data
     /// </summary>
     public static class Ingredient
     {
-        /// <summary>An item ingredient, counted in items.</summary>
+        /// <summary>An item ingredient, counted in items (e.g. <c>Ingredient.Item(Vanilla.Items.ElectronicCircuit, 5)</c>).</summary>
         public static RecipeValue Item(string name, double amount) => RecipeValue.Item(name, amount);
 
-        /// <summary>A fluid ingredient, counted in fluid units.</summary>
+        /// <summary>A fluid ingredient, counted in fluid units (e.g. <c>Ingredient.Fluid(Vanilla.Fluids.Water, 50)</c>).</summary>
         public static RecipeValue Fluid(string name, double amount) => RecipeValue.Fluid(name, amount);
+
+        /// <summary>Typed item ingredient: <c>Ingredient.Of(Vanilla.Items.ElectronicCircuit, 5)</c>.</summary>
+        public static RecipeValue Of(ItemId item, double amount) => RecipeValue.Item(item.Name, amount);
+
+        /// <summary>Typed fluid ingredient: <c>Ingredient.Of(Vanilla.Fluids.Water, 50)</c>.</summary>
+        public static RecipeValue Of(FluidId fluid, double amount) => RecipeValue.Fluid(fluid.Name, amount);
     }
 
     /// <summary>
@@ -222,6 +228,14 @@ namespace Factorio.Data
         /// <summary>A fluid product with an explicit output temperature or probability.</summary>
         public static RecipeValue Fluid(string name, double amount, double? temperature = null, double? probability = null) =>
             RecipeValue.Fluid(name, amount, temperature: temperature, probability: probability);
+
+        /// <summary>Typed item product: <c>Product.Of(Vanilla.Items.ElectronicCircuit, 2)</c>.</summary>
+        public static RecipeValue Of(ItemId item, double amount, double? probability = null) =>
+            RecipeValue.Item(item.Name, amount, probability: probability);
+
+        /// <summary>Typed fluid product: <c>Product.Of(Vanilla.Fluids.Water, 50)</c>.</summary>
+        public static RecipeValue Of(FluidId fluid, double amount, double? temperature = null, double? probability = null) =>
+            RecipeValue.Fluid(fluid.Name, amount, temperature: temperature, probability: probability);
     }
 
     /// <summary>

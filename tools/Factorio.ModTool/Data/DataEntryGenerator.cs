@@ -34,7 +34,8 @@ public static class DataEntryGenerator
         string Lua,
         IReadOnlyList<PrototypeDefinition> Prototypes,
         IReadOnlySet<string> Inherited,
-        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> Names);
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> Names,
+        string? SettingsLua = null);
 
     /// <summary>
     /// Compiles <paramref name="sources"/>, runs the mod's <see cref="ModDefinition"/> and writes
@@ -91,6 +92,7 @@ public static class DataEntryGenerator
         Asset.ResourceRoots = ResolveResourceRoots(sources, resourceRoots);
         IReadOnlyList<PrototypeDefinition> prototypes;
         string lua;
+        string? settingsLua;
         try
         {
             try
@@ -107,7 +109,11 @@ public static class DataEntryGenerator
             if (prototypes.Count == 0)
                 throw new ToolException($"dataEntry '{entryType}' defined no prototypes (did Define() call mod.Add?)");
 
-            lua = Write(prototypes, apiVersion);
+            var settingsProtos = prototypes.Where(p => p is SettingDefinition).ToList();
+            var dataProtos = prototypes.Where(p => p is not SettingDefinition).ToList();
+
+            lua = dataProtos.Count > 0 ? Write(dataProtos, apiVersion) : string.Empty;
+            settingsLua = settingsProtos.Count > 0 ? WriteSettings(settingsProtos, apiVersion) : null;
         }
         finally
         {
@@ -128,7 +134,7 @@ public static class DataEntryGenerator
             prototype => (IReadOnlyDictionary<string, string>)prototype.Localisations,
             StringComparer.Ordinal);
 
-        return new Result(lua, prototypes, inherited, names);
+        return new Result(lua, prototypes, inherited, names, settingsLua);
     }
 
     private static IReadOnlyList<string> ResolveResourceRoots(
@@ -176,6 +182,19 @@ public static class DataEntryGenerator
         writer.Line("");
 
         return writer + Inherit + "data:extend(prototypes)\n";
+    }
+
+    /// <summary>Writes collected <see cref="SettingDefinition"/> objects as <c>settings.lua</c>.</summary>
+    public static string WriteSettings(IReadOnlyList<PrototypeDefinition> settings, string apiVersion)
+    {
+        var writer = new LuaWriter(apiVersion);
+        writer.Line("-- Generated from C# by factorio-mod. Do not edit: change the setting definitions under data/ and rebuild.");
+        writer.Line("data:extend(");
+        writer.BeginArray();
+        foreach (var setting in settings) writer.Value(setting);
+        writer.EndArray();
+        writer.Line(")");
+        return writer.ToString();
     }
 
     /// <summary>

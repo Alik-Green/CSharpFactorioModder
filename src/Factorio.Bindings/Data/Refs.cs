@@ -2,101 +2,42 @@ using System;
 
 namespace Factorio.Data
 {
-    /// <summary>Strongly-typed reference to an item prototype name (implicitly convertible with <see cref="string"/>).</summary>
-    public sealed class ItemId : PrototypeName
+    public sealed partial class ItemId
     {
-        /// <summary>Creates an item prototype reference.</summary>
-        public ItemId(string name) : base(name) { }
+        /// <summary>Recipe shorthand: <c>Vanilla.Items.ElectronicCircuit * 5</c> creates an item ingredient/product of count <paramref name="amount"/>.</summary>
+        public static RecipeValue operator *(ItemId item, double amount) =>
+            RecipeValue.Item(item.Name, amount);
 
-        /// <summary>Implicitly wraps a string prototype name.</summary>
-        public static implicit operator ItemId?(string? name) => name == null ? null : new ItemId(name);
+        /// <summary>Recipe shorthand: <c>5 * Vanilla.Items.ElectronicCircuit</c>.</summary>
+        public static RecipeValue operator *(double amount, ItemId item) =>
+            RecipeValue.Item(item.Name, amount);
 
-        /// <summary>Implicitly unwraps to its string prototype name.</summary>
-        public static implicit operator string?(ItemId? id) => id?.Name;
+        /// <summary>Creates an item product with a probability between <c>0</c> and <c>1</c> (e.g. <c>0.25</c> = 25%).</summary>
+        public RecipeValue Chance(double amount, double probability) =>
+            RecipeValue.Item(Name, amount, probability: probability);
 
-        /// <summary>References any item prototype by name.</summary>
-        public static ItemId Of(string name) => new(name);
+        /// <summary>Creates an item product giving a random count between <paramref name="min"/> and <paramref name="max"/>.</summary>
+        public RecipeValue Range(double min, double max, double? probability = null) =>
+            RecipeValue.ItemRange(Name, min, max, probability);
     }
 
-    /// <summary>Strongly-typed reference to an entity prototype name (implicitly convertible with <see cref="string"/>).</summary>
-    public sealed class EntityId : PrototypeName
+    public sealed partial class FluidId
     {
-        /// <summary>Creates an entity prototype reference.</summary>
-        public EntityId(string name) : base(name) { }
+        /// <summary>Allows passing <c>Vanilla.Fluids.Water</c> directly to <c>new FluidDefinition("...", Vanilla.Fluids.Water)</c>.</summary>
+        public static implicit operator VanillaPrototype?(FluidId? fluid) =>
+            fluid == null ? null : new VanillaPrototype("fluid", fluid.Name);
 
-        /// <summary>Implicitly wraps a string prototype name.</summary>
-        public static implicit operator EntityId?(string? name) => name == null ? null : new EntityId(name);
+        /// <summary>Recipe shorthand: <c>Vanilla.Fluids.Water * 50</c> creates a fluid ingredient/product of <paramref name="amount"/> units.</summary>
+        public static RecipeValue operator *(FluidId fluid, double amount) =>
+            RecipeValue.Fluid(fluid.Name, amount);
 
-        /// <summary>Implicitly unwraps to its string prototype name.</summary>
-        public static implicit operator string?(EntityId? id) => id?.Name;
+        /// <summary>Recipe shorthand: <c>50 * Vanilla.Fluids.Water</c>.</summary>
+        public static RecipeValue operator *(double amount, FluidId fluid) =>
+            RecipeValue.Fluid(fluid.Name, amount);
 
-        /// <summary>References any entity prototype by name.</summary>
-        public static EntityId Of(string name) => new(name);
-
-        /// <summary>Vanilla 1×1 corpse remnants.</summary>
-        public static readonly EntityId SmallRemnants = new("small-remnants");
-
-        /// <summary>Vanilla 2×2 corpse remnants.</summary>
-        public static readonly EntityId MediumRemnants = new("medium-remnants");
-
-        /// <summary>Vanilla 3×3 corpse remnants (used by assembling machines &amp; chemical plants).</summary>
-        public static readonly EntityId BigRemnants = new("big-remnants");
-    }
-
-    /// <summary>Strongly-typed reference to a fluid prototype name, with named constants for vanilla fluids.</summary>
-    public sealed class FluidId : PrototypeName
-    {
-        /// <summary>Creates a fluid prototype reference.</summary>
-        public FluidId(string name) : base(name) { }
-
-        /// <summary>Implicitly wraps a string fluid name.</summary>
-        public static implicit operator FluidId?(string? name) => name == null ? null : new FluidId(name);
-
-        /// <summary>Implicitly unwraps to its string fluid name.</summary>
-        public static implicit operator string?(FluidId? id) => id?.Name;
-
-        /// <summary>References any fluid prototype by name.</summary>
-        public static FluidId Of(string name) => new(name);
-
-        /// <summary>Base-game water (<c>"water"</c>).</summary>
-        public static readonly FluidId Water = new("water");
-
-        /// <summary>Base-game steam (<c>"steam"</c>).</summary>
-        public static readonly FluidId Steam = new("steam");
-
-        /// <summary>Base-game crude oil (<c>"crude-oil"</c>).</summary>
-        public static readonly FluidId CrudeOil = new("crude-oil");
-
-        /// <summary>Base-game heavy oil (<c>"heavy-oil"</c>).</summary>
-        public static readonly FluidId HeavyOil = new("heavy-oil");
-
-        /// <summary>Base-game light oil (<c>"light-oil"</c>).</summary>
-        public static readonly FluidId LightOil = new("light-oil");
-
-        /// <summary>Base-game petroleum gas (<c>"petroleum-gas"</c>).</summary>
-        public static readonly FluidId PetroleumGas = new("petroleum-gas");
-
-        /// <summary>Base-game lubricant (<c>"lubricant"</c>).</summary>
-        public static readonly FluidId Lubricant = new("lubricant");
-
-        /// <summary>Base-game sulfuric acid (<c>"sulfuric-acid"</c>).</summary>
-        public static readonly FluidId SulfuricAcid = new("sulfuric-acid");
-    }
-
-    /// <summary>Strongly-typed reference to a recipe prototype name (implicitly convertible with <see cref="string"/>).</summary>
-    public sealed class RecipeId : PrototypeName
-    {
-        /// <summary>Creates a recipe prototype reference.</summary>
-        public RecipeId(string name) : base(name) { }
-
-        /// <summary>Implicitly wraps a string recipe name.</summary>
-        public static implicit operator RecipeId?(string? name) => name == null ? null : new RecipeId(name);
-
-        /// <summary>Implicitly unwraps to its string recipe name.</summary>
-        public static implicit operator string?(RecipeId? id) => id?.Name;
-
-        /// <summary>References any recipe prototype by name.</summary>
-        public static RecipeId Of(string name) => new(name);
+        /// <summary>Creates a fluid product with an explicit output temperature (e.g. <c>Vanilla.Fluids.Steam.AtTemp(50, 165)</c>).</summary>
+        public RecipeValue AtTemp(double amount, double temperature, double? probability = null) =>
+            RecipeValue.Fluid(Name, amount, temperature: temperature, probability: probability);
     }
 
     /// <summary>Factory helpers for item prototype references.</summary>
@@ -125,5 +66,12 @@ namespace Factorio.Data
     {
         /// <summary>References a recipe prototype by name.</summary>
         public static RecipeId Of(string name) => new(name);
+    }
+
+    /// <summary>Factory helpers for technology prototype references.</summary>
+    public static class TechRef
+    {
+        /// <summary>References a technology prototype by name.</summary>
+        public static TechnologyId Of(string name) => new(name);
     }
 }

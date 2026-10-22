@@ -32,9 +32,9 @@ namespace {{namespace}}
         /// <summary>Declares the item.</summary>
         public Token() : base("{{id}}-token")
         {
-            // Reusing the base game's art means nothing has to be drawn or rendered. A mod with
-            // its own graphics puts them in resources/ and uses Asset.Mod("graphics/icons/x.png").
-            Icon = Asset.Base("graphics/icons/iron-plate.png");
+            // Every base-game item, fluid, machine, entity, recipe, tech, and icon is typed under
+            // Vanilla.* — or drop your own PNG of ANY resolution in resources/ and use Asset.Mod(...)!
+            Icon = Vanilla.Icons.Items.IronPlate;
             IconSize = 64;
             StackSize = 100;
 
@@ -61,7 +61,9 @@ namespace {{namespace}}
             EnergyRequired = 1;
             Order = SortOrder.At("z", "{{id}}-token");
 
-            Ingredients = [Ingredient.Item("iron-plate", 1)];
+            // Tip: `Ingredient.Item(Vanilla.Items.IronPlate, 1)` AND `Vanilla.Items.IronPlate * 1`
+            // both work across all ~270+ vanilla items, fluids, and machines!
+            Ingredients = [Ingredient.Item(Vanilla.Items.IronPlate, 1)];
             Results = [Product.Item("{{id}}-token", 2)];
 
             LocalisedName = "{{title}} token";

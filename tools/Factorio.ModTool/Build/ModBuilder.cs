@@ -94,6 +94,7 @@ public static class ModBuilder
 
         // 4. Evaluate optional C# data stage (`dataEntry`)
         string? generatedDataLua = null;
+        string? generatedSettingsLua = null;
         IReadOnlySet<string>? inheritedPrototypes = null;
         var generatedLocale = new Dictionary<string, string>(StringComparer.Ordinal);
 
@@ -105,7 +106,8 @@ public static class ModBuilder
                 target.ModVersion,
                 project.Name,
                 project.Resources.Select(r => Path.Combine(project.ProjectDirectory, r)).ToArray());
-            generatedDataLua = dataResult.Lua;
+            generatedDataLua = string.IsNullOrEmpty(dataResult.Lua) ? null : dataResult.Lua;
+            generatedSettingsLua = dataResult.SettingsLua;
             inheritedPrototypes = dataResult.Inherited;
 
             foreach (var (protoKey, locs) in dataResult.Names)
@@ -150,7 +152,8 @@ public static class ModBuilder
             generatedLocale,
             settings,
             zip: options.Zip,
-            outputDirectory: options.OutputDirectory);
+            outputDirectory: options.OutputDirectory,
+            generatedSettingsLua: generatedSettingsLua);
         warnings.AddRange(packaged.Warnings);
 
         // 8. Validate Lua 5.2 syntax, CoreSystem calls, data-stage prototypes & locale names
@@ -240,6 +243,14 @@ public static class ModBuilder
             var compatFile = Path.Combine(bindingsBase, "Compat.cs");
             if (File.Exists(compatFile))
                 inputs.Add(compatFile);
+
+            // Expose Vanilla.* prototype constants cleanly to runtime C# scripts too (zero emitted code).
+            foreach (var sharedDataFile in new[] { "VanillaCore.cs", "VanillaCatalog.cs" })
+            {
+                var path = Path.Combine(bindingsBase, "Data", sharedDataFile);
+                if (File.Exists(path))
+                    inputs.Add(path);
+            }
         }
 
         inputs.AddRange(project.SourceFiles());

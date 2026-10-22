@@ -1,6 +1,8 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.CompilerServices;
 
 namespace Factorio.Data
 {
@@ -184,5 +186,117 @@ namespace Factorio.Data
             if (_sprite != null) _sprite.Write(writer);
             else writer.Value(Path);
         }
+    }
+
+    /// <summary>
+    /// One layer inside <see cref="PrototypeDefinition.Icons"/> — lets you create tinted or badged
+    /// icons directly from vanilla Factorio icons in pure C# without external image editing!
+    /// <code>
+    /// Icons = [
+    ///     IconLayer.Tinted(Vanilla.Icons.Machines.ChemicalPlant, Rgb.Hex("#38BDF8")),
+    ///     IconLayer.Badge(Vanilla.Icons.Fluids.Water),
+    /// ];
+    /// </code>
+    /// </summary>
+    public sealed class IconLayer : ILuaValue
+    {
+        private readonly string _icon;
+        private readonly int? _iconSize;
+        private readonly Rgb? _tint;
+        private readonly double? _scale;
+        private readonly double _shiftX;
+        private readonly double _shiftY;
+
+        private IconLayer(string icon, int? iconSize = null, Rgb? tint = null, double? scale = null, double shiftX = 0, double shiftY = 0)
+        {
+            _icon = icon;
+            _iconSize = iconSize;
+            _tint = tint;
+            _scale = scale;
+            _shiftX = shiftX;
+            _shiftY = shiftY;
+        }
+
+        /// <summary>Full-size base icon layer.</summary>
+        public static IconLayer Of(IconSpec icon, int? iconSize = null, Rgb? tint = null, double? scale = null, double shiftX = 0, double shiftY = 0) =>
+            new(icon.Path, iconSize, tint, scale, shiftX, shiftY);
+
+        /// <summary>Tints an existing icon with <paramref name="tint"/>.</summary>
+        public static IconLayer Tinted(IconSpec icon, Rgb tint, int? iconSize = null) =>
+            new(icon.Path, iconSize, tint: tint);
+
+        /// <summary>Overlays a small corner badge icon (default top-left corner at quarter scale).</summary>
+        public static IconLayer Badge(IconSpec icon, double scale = 0.25, double shiftX = -8, double shiftY = -8, Rgb? tint = null) =>
+            new(icon.Path, tint: tint, scale: scale, shiftX: shiftX, shiftY: shiftY);
+
+        /// <inheritdoc />
+        public void Write(LuaWriter writer)
+        {
+            int? resolvedSize = _iconSize;
+            if (!resolvedSize.HasValue)
+            {
+                if (Asset.TryReadModPngSize(_icon, out var pngW, out var pngH))
+                    resolvedSize = Math.Min(pngW, pngH);
+                else if (_icon.StartsWith("__base__/graphics/technology/", StringComparison.Ordinal) ||
+                         _icon.StartsWith("__space-age__/graphics/technology/", StringComparison.Ordinal))
+                    resolvedSize = 256;
+            }
+
+            writer.BeginTable();
+            writer.Key("icon");
+            writer.Value(_icon);
+            if (resolvedSize.HasValue)
+            {
+                writer.Key("icon_size");
+                writer.Value(resolvedSize.Value);
+            }
+            if (_tint != null)
+            {
+                writer.Key("tint");
+                writer.Value(_tint);
+            }
+            if (_scale.HasValue)
+            {
+                writer.Key("scale");
+                writer.Value(_scale.Value);
+            }
+            if (_shiftX != 0 || _shiftY != 0)
+            {
+                writer.Key("shift");
+                writer.BeginArray();
+                writer.Value(_shiftX);
+                writer.Value(_shiftY);
+                writer.EndArray();
+            }
+            writer.EndTable();
+        }
+    }
+
+    /// <summary>Strongly-typed collection of <see cref="IconLayer"/> entries for <see cref="PrototypeDefinition.Icons"/>.</summary>
+    [CollectionBuilder(typeof(IconLayerList), nameof(Create))]
+    public sealed class IconLayerList : ILuaValue, IEnumerable<IconLayer>
+    {
+        private readonly List<IconLayer> _items = new();
+
+        /// <summary>Builds from <c>[IconLayer.Tinted(...), IconLayer.Badge(...)]</c>.</summary>
+        public static IconLayerList Create(ReadOnlySpan<IconLayer> items)
+        {
+            var list = new IconLayerList();
+            foreach (var item in items) list._items.Add(item);
+            return list;
+        }
+
+        /// <inheritdoc />
+        public void Write(LuaWriter writer)
+        {
+            writer.BeginArray();
+            foreach (var item in _items) writer.Value(item);
+            writer.EndArray();
+        }
+
+        /// <inheritdoc />
+        public IEnumerator<IconLayer> GetEnumerator() => _items.GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

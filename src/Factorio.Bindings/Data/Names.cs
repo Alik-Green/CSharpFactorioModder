@@ -5,57 +5,6 @@ using System.Linq;
 namespace Factorio.Data
 {
     /// <summary>
-    /// A prototype name used as a value: a string with a type, so a typo or a forgotten declaration
-    /// is something the compiler or the build can catch.
-    /// <para>
-    /// Factorio calls most things by name - an item's subgroup, a recipe's category, the sort order
-    /// inside a tab. Some of those names are fixed by the game (<see cref="Subgroup.ProductionMachine"/>,
-    /// <see cref="CraftingCategory.Chemistry"/>), and some are declared by mods. Rather than model
-    /// that with two overloads, each of the three name types below is a string with named constants:
-    /// </para>
-    /// <code>
-    /// Subgroup = Subgroup.ProductionMachine,          // one of the base game's
-    /// Subgroup = "my-mod-tab",                       // a string still works, for a custom one
-    /// Subgroup = Subgroup.Of("my-mod-tab"),          // ... and says at the call site what it is
-    /// </code>
-    /// <para>
-    /// The build checks both kinds: a name the mod does not declare has to be one of the base game's,
-    /// exactly like a recipe category.
-    /// </para>
-    /// </summary>
-    public abstract class PrototypeName : IEquatable<PrototypeName>
-    {
-        /// <summary>Creates a name.</summary>
-        /// <param name="name">The prototype name, as Factorio spells it.</param>
-        protected PrototypeName(string name)
-        {
-            Name = name;
-        }
-
-        /// <summary>The name, as Factorio spells it.</summary>
-        public string Name { get; }
-
-        /// <summary>The name, for logs and messages.</summary>
-        /// <returns>The name.</returns>
-        public override string ToString() => Name;
-
-        /// <summary>Two names are equal when they spell the same thing.</summary>
-        /// <param name="other">The other name.</param>
-        /// <returns>True when equal.</returns>
-        public bool Equals(PrototypeName? other) => other is not null && Name == other.Name;
-
-        /// <summary>Two names are equal when they spell the same thing.</summary>
-        /// <param name="obj">The other object.</param>
-        /// <returns>True when equal.</returns>
-        public override bool Equals(object? obj) => obj is PrototypeName other && Equals(other);
-
-        /// <summary>A hash code from the name.</summary>
-        /// <returns>The hash code.</returns>
-        public override int GetHashCode() => Name.GetHashCode(StringComparison.Ordinal);
-
-    }
-
-    /// <summary>
     /// A tab in the crafting menu: <c>item-subgroup</c> in the prototype API.
     /// <para>
     /// The named members are the base game's subgroups. A mod that wants its own tab declares it

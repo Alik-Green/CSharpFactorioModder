@@ -13,12 +13,71 @@ namespace Factorio.Data
     {
         private EntityFlag _flags = EntityFlag.None;
 
+        private Func<EntityDefinition, PrototypeDefinition[]>? _companionFactory;
+
         /// <summary>Declares an entity of a given prototype type.</summary>
         /// <param name="type">Entity prototype type, e.g. <c>assembling-machine</c>.</param>
         /// <param name="name">Entity prototype name.</param>
         public EntityDefinition(string type, string name) : base(type, name)
         {
         }
+
+        /// <summary>
+        /// All-in-one QoL helper: marks this machine minable AND tells <see cref="ModBuilder.Add(PrototypeDefinition)"/>
+        /// to automatically generate its matching <see cref="ItemDefinition"/> (inheriting icon,
+        /// localised name/description, subgroup, order, and <c>PlaceResult = Name</c>) plus its
+        /// <see cref="RecipeDefinition"/>!
+        /// <code>
+        /// Craftable(
+        ///     ingredients: [Vanilla.Items.IronPlate * 10, Vanilla.Items.ElectronicCircuit * 5],
+        ///     stackSize: 10,
+        ///     subgroup: Subgroup.ExtractionMachine,
+        ///     energyRequired: 2.0,
+        ///     enabled: false);
+        /// </code>
+        /// </summary>
+        public void Craftable(
+            RecipeValueList ingredients,
+            double stackSize = 50,
+            Subgroup? subgroup = null,
+            double energyRequired = 0.5,
+            bool enabled = true,
+            CategoryList? categories = null,
+            double resultCount = 1)
+        {
+            if (MinableResult == null)
+                MinableResult = Name;
+
+            _companionFactory = self =>
+            {
+                var item = new ItemDefinition(self.Name)
+                {
+                    PlaceResult = self.Name,
+                    StackSize = stackSize,
+                };
+                if (self.Icon != null) item.Icon = self.Icon;
+                if (self.Icons != null) item.Icons = self.Icons;
+                if (self.IconSize > 0) item.IconSize = self.IconSize;
+                if (subgroup != null) item.Subgroup = subgroup;
+                if (self.Order != null) item.Order = self.Order;
+                if (self.LocalisedName != null) item.LocalisedName = self.LocalisedName;
+                if (self.LocalisedDescription != null) item.LocalisedDescription = self.LocalisedDescription;
+
+                var recipe = new RecipeDefinition(self.Name)
+                {
+                    Enabled = enabled,
+                    EnergyRequired = energyRequired,
+                    Ingredients = ingredients,
+                    Results = [Product.Item(self.Name, resultCount)],
+                };
+                if (categories != null) recipe.Categories = categories;
+
+                return new PrototypeDefinition[] { item, recipe };
+            };
+        }
+
+        internal PrototypeDefinition[] CreateCompanionDefinitions() =>
+            _companionFactory == null ? Array.Empty<PrototypeDefinition>() : _companionFactory(this);
 
         /// <summary>
         /// The item this entity drops when mined: e.g. <c>ItemRef.Of("atmospheric-condenser")</c> or

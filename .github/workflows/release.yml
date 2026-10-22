@@ -32,7 +32,7 @@ jobs:
             if ("$env:GITHUB_REF" -like "refs/tags/v*") {
               $ver = "$env:GITHUB_REF" -replace '^refs/tags/v',''
             } else {
-              $ver = "1.0.3"
+              $ver = "1.0.4"
             }
           }
           $ver = $ver.TrimStart('v')
@@ -135,10 +135,10 @@ jobs:
                 '{'
                 '    public override void Define(ModBuilder mod)'
                 '    {'
-                '        mod.Add(new CondenserMachine());'
-                '        mod.Add(new CondenserItem());'
-                '        mod.Add(new CondenserRecipe());'
-                '        mod.Add(new CondenserTech());'
+                '        mod.Add('
+                '            new BoolSettingDefinition("greenmod-turbo", defaultValue: true) { LocalisedName = "Turbo mode" },'
+                '            new CondenserMachine(),'
+                '            new CondenserTech());'
                 '    }'
                 '}'
                 'public sealed class CondenserMachine : AssemblingMachineDefinition'
@@ -147,6 +147,7 @@ jobs:
                 '    {'
                 '        LocalisedName = "Atmospheric Condenser";'
                 '        Icon = Asset.Mod("graphics/entity/atmospheric-condenser.png");'
+                '        Corpse = Vanilla.Entities.MediumRemnants;'
                 '        CollisionBox = BoundingBox.Collision(2, 3);'
                 '        SelectionBox = BoundingBox.Selection(2, 3);'
                 '        Graphics = GraphicsSet.Auto(Asset.Mod("graphics/entity/atmospheric-condenser.png"), tiles: 3);'
@@ -154,30 +155,17 @@ jobs:
                 '        CraftingSpeed = 1.0;'
                 '        EnergyUsage = Energy.Kilowatts(180);'
                 '        EnergySource = EnergySource.Electric();'
-                '        FluidBoxes = [FluidBox.Output(FluidId.Water, 100, [PipePort.East(0.5, 0)])];'
-                '        MinableResult = "atmospheric-condenser";'
-                '    }'
-                '}'
-                'public sealed class CondenserItem : ItemDefinition'
-                '{'
-                '    public CondenserItem() : base("atmospheric-condenser")'
-                '    {'
-                '        LocalisedName = "Atmospheric Condenser";'
-                '        Icon = Asset.Mod("graphics/entity/atmospheric-condenser.png");'
-                '        StackSize = 10;'
-                '        Subgroup = Subgroup.ExtractionMachine;'
-                '        PlaceResult = "atmospheric-condenser";'
-                '    }'
-                '}'
-                'public sealed class CondenserRecipe : RecipeDefinition'
-                '{'
-                '    public CondenserRecipe() : base("atmospheric-condenser")'
-                '    {'
-                '        LocalisedName = "Atmospheric Condenser";'
-                '        Enabled = false;'
-                '        EnergyRequired = 2;'
-                '        Ingredients = [Ingredient.Item("iron-plate", 10)];'
-                '        Results = [Product.Item("atmospheric-condenser", 1)];'
+                '        FluidBoxes = [FluidBox.Output(Vanilla.Fluids.Water, 100, [PipePort.East(0.5, 0)])];'
+                '        Craftable('
+                '            ingredients: ['
+                '                Ingredient.Item(Vanilla.Items.ElectronicCircuit, 5),'
+                '                Vanilla.Items.IronPlate * 10,'
+                '                Vanilla.Machines.Pump * 1,'
+                '            ],'
+                '            stackSize: 10,'
+                '            subgroup: Subgroup.ExtractionMachine,'
+                '            energyRequired: 2,'
+                '            enabled: false);'
                 '    }'
                 '}'
                 'public sealed class CondenserTech : TechnologyDefinition'
@@ -185,8 +173,8 @@ jobs:
                 '    public CondenserTech() : base("atmospheric-condensation")'
                 '    {'
                 '        LocalisedName = "Atmospheric Condensation";'
-                '        Icon = Asset.Mod("graphics/entity/atmospheric-condenser.png");'
-                '        Prerequisites = ["fluid-handling"];'
+                '        Icon = Vanilla.Icons.Technologies.FluidHandling;'
+                '        Prerequisites = [Vanilla.Technologies.FluidHandling, Vanilla.Technologies.Electronics];'
                 '        Effects = [TechEffect.UnlockRecipe("atmospheric-condenser")];'
                 '        Count = 100;'
                 '        Time = 30;'
@@ -210,8 +198,11 @@ jobs:
 
               Expand-Archive -Path $deployedZip -DestinationPath "$smokeDir\unzipped" -Force
               $dataLua = Get-Content "$smokeDir\unzipped\GreenMod_0.1.0\data.lua" -Raw
-              if ($dataLua -notmatch 'width = 146' -or $dataLua -notmatch 'height = 149' -or $dataLua -notmatch 'icon_size = 146') {
-                throw "Auto-scaled PNG dimensions missing from generated data.lua:`n$dataLua"
+              if ($dataLua -notmatch 'width = 146' -or $dataLua -notmatch 'height = 149' -or $dataLua -notmatch 'icon_size = 146' -or $dataLua -notmatch 'electronic-circuit') {
+                throw "Expected v1.0.4 generated fields missing from data.lua:`n$dataLua"
+              }
+              if (-not (Test-Path "$smokeDir\unzipped\GreenMod_0.1.0\settings.lua")) {
+                throw "Expected generated settings.lua missing from zip"
               }
             } finally {
               Pop-Location
