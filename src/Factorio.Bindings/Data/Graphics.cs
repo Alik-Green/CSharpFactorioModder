@@ -151,11 +151,11 @@ namespace Factorio.Data
 
         /// <summary>A picture drawn at its natural pixel size (<c>scale = 1</c>).</summary>
         public static Sprite File(string filename, double width, double height) =>
-            new(filename, width, height, 1, 0, 0);
+            new(filename, width, height, 1, 0, 0, autoMeasure: false);
 
         /// <summary>A picture drawn with an explicit pixel box and <paramref name="scale"/>.</summary>
         public static Sprite Scaled(string filename, double width, double height, double scale) =>
-            new(filename, width, height, scale, 0, 0);
+            new(filename, width, height, scale, 0, 0, autoMeasure: false);
 
         /// <summary>
         /// Offsets this sprite in <b>tiles</b> relative to its aligned grid position:
