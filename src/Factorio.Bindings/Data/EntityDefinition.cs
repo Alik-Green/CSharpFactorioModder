@@ -5,8 +5,8 @@ namespace Factorio.Data
     /// <summary>
     /// An entity: something that exists on the map.
     /// <para>
-    /// This is the part every machine shares - what it drops when mined, how much punishment it
-    /// takes, where its collision box is. The concrete machine type adds its own fields.
+    /// This is the part every machine shares - what it drops when mined, how much damage it takes,
+    /// and its <see cref="CollisionBox"/> / <see cref="SelectionBox"/>.
     /// </para>
     /// </summary>
     public class EntityDefinition : PrototypeDefinition
@@ -21,20 +21,15 @@ namespace Factorio.Data
         }
 
         /// <summary>
-        /// The item this entity drops when mined: <c>ItemRef.Of("demo-assembler")</c>.
-        /// <para>
-        /// Setting it also gives <c>minable</c> the mining time the game requires (0.5 s, unless
-        /// <see cref="MiningTime"/> says otherwise): the game rejects a <c>minable</c> table without
-        /// one, and a partial table would not be filled in by inheritance either - inheritance
-        /// works one top-level field at a time.
-        /// </para>
+        /// The item this entity drops when mined: e.g. <c>ItemRef.Of("atmospheric-condenser")</c> or
+        /// <c>"atmospheric-condenser"</c>. Automatically sets <see cref="MiningTime"/> to <c>0.5</c> if unset.
         /// </summary>
-        public string? MinableResult
+        public ItemId? MinableResult
         {
             get => GetNested("minable", "result") as string;
             set
             {
-                SetNested("minable", "result", value);
+                SetNested("minable", "result", value?.Name);
                 if (value != null && GetNested("minable", "mining_time") == null)
                     SetNested("minable", "mining_time", 0.5);
             }
@@ -50,13 +45,12 @@ namespace Factorio.Data
         }
 
         /// <summary>
-        /// The entity this one upgrades to. Setting it to <c>null</c> is meaningful: a machine built
-        /// on a vanilla prototype would otherwise inherit the vanilla upgrade path.
+        /// The entity this one upgrades to. Setting it to <c>null</c> clears an inherited vanilla upgrade path.
         /// </summary>
-        public string? NextUpgrade
+        public EntityId? NextUpgrade
         {
             get => Get("next_upgrade") as string;
-            set => Set("next_upgrade", value);
+            set => Set("next_upgrade", value?.Name);
         }
 
         /// <summary>Hit points.</summary>
@@ -67,9 +61,7 @@ namespace Factorio.Data
         }
 
         /// <summary>
-        /// What can be done with the entity. A machine the player builds wants
-        /// <c>EntityFlag.PlaceableNeutral | EntityFlag.PlaceablePlayer | EntityFlag.PlayerCreation</c>,
-        /// which is what <see cref="AssemblingMachineDefinition"/> starts from.
+        /// Entity flags (e.g. <c>EntityFlag.PlaceableNeutral | EntityFlag.PlaceablePlayer | EntityFlag.PlayerCreation</c>).
         /// </summary>
         public EntityFlag Flags
         {
@@ -82,40 +74,73 @@ namespace Factorio.Data
         }
 
         /// <summary>
-        /// The area the entity occupies, as <c>Bounds.Of(left, top, right, bottom)</c>. Pipe
-        /// connections have to lie inside it, and the build checks that they do.
+        /// Solid collision area relative to the entity's centre (in tiles):
+        /// <list type="bullet">
+        /// <item><description><c>new BoundingBox(-1.2, -1.2, 1.2, 1.2)</c> — explicit <c>(left, top, right, bottom)</c></description></item>
+        /// <item><description><c>new BoundingBox(2, 3)</c> — centered <c>width × height</c> in tiles</description></item>
+        /// <item><description><c>BoundingBox.Collision(2, 3)</c> or <c>BoundingBox.Machine3x3</c> — standard Factorio machine inset</description></item>
+        /// </list>
         /// </summary>
-        public object? CollisionBox
+        public BoundingBox? CollisionBox
         {
-            get => Get("collision_box");
+            get => Get("collision_box") as BoundingBox;
             set => Set("collision_box", value);
         }
 
-        /// <summary>The area the player can click, as <c>Bounds.Of(...)</c>; usually a little larger.</summary>
-        public object? SelectionBox
+        /// <summary>
+        /// Yellow selection rectangle shown when hovering the entity (in tiles):
+        /// e.g. <c>BoundingBox.Selection(3, 3)</c>, <c>BoundingBox.Tiles3x3</c>, <c>new BoundingBox(2, 3)</c>,
+        /// or <c>new BoundingBox(-1.5, -1.5, 1.5, 1.5)</c>.
+        /// </summary>
+        public BoundingBox? SelectionBox
         {
-            get => Get("selection_box");
+            get => Get("selection_box") as BoundingBox;
             set => Set("selection_box", value);
         }
 
-        /// <summary>Particle and sound effects played when the entity is destroyed.</summary>
-        public string? Corpse
+        /// <summary>Extra vertical drawing headroom above the entity (in tiles) for tall sprites.</summary>
+        public double DrawingBoxVerticalExtension
+        {
+            get => Number("drawing_box_vertical_extension");
+            set => Set("drawing_box_vertical_extension", value);
+        }
+
+        /// <summary>
+        /// Remnant entity spawned when destroyed (e.g. <see cref="EntityId.BigRemnants"/>,
+        /// <see cref="EntityId.MediumRemnants"/>, or <c>EntityRef.Of("big-remnants")</c>).
+        /// </summary>
+        public EntityId? Corpse
         {
             get => Get("corpse") as string;
-            set => Set("corpse", value);
+            set => Set("corpse", value?.Name);
+        }
+
+        /// <summary>Group name allowing machines of the same family to fast-replace one another.</summary>
+        public string? FastReplaceableGroup
+        {
+            get => Get("fast_replaceable_group") as string;
+            set => Set("fast_replaceable_group", value);
+        }
+
+        /// <summary>Custom colour drawn on the Factorio minimap/map view.</summary>
+        public Rgb? MapColor
+        {
+            get => Get("map_color") as Rgb;
+            set => Set("map_color", value);
+        }
+
+        /// <summary>Custom friendly-force colour drawn on the Factorio minimap/map view.</summary>
+        public Rgb? FriendlyMapColor
+        {
+            get => Get("friendly_map_color") as Rgb;
+            set => Set("friendly_map_color", value);
         }
 
         /// <summary>Reads a field of a nested table, if it was assigned.</summary>
-        /// <param name="parent">The nested table's field name.</param>
-        /// <param name="name">Field inside the nested table.</param>
-        /// <returns>The value, or null.</returns>
         protected object? GetNested(string parent, string name) =>
             Get(parent) is NestedTable nested ? nested.Get(name) : null;
 
         /// <summary>Sets a field of a nested table, creating that table on first use.</summary>
-        /// <param name="parent">The nested table's field name.</param>
-        /// <param name="name">Field inside the nested table.</param>
-        /// <param name="value">The value.</param>
         protected void SetNested(string parent, string name, object? value)
         {
             if (Get(parent) is not NestedTable nested)
@@ -126,17 +151,12 @@ namespace Factorio.Data
             nested.Set(name, value);
         }
 
-        /// <summary>
-        /// A prototype table built field by field, for the nested tables a definition writes into
-        /// (<c>minable</c>, <c>energy_source</c>).
-        /// </summary>
+        /// <summary>A prototype table built field by field (<c>minable</c>, etc.).</summary>
         protected sealed class NestedTable : ILuaValue
         {
             private readonly System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, object?>> _fields = new();
 
             /// <summary>Assigns a field.</summary>
-            /// <param name="name">Field name.</param>
-            /// <param name="value">The value.</param>
             public void Set(string name, object? value)
             {
                 for (var i = 0; i < _fields.Count; i++)
@@ -149,8 +169,6 @@ namespace Factorio.Data
             }
 
             /// <summary>Reads a field that was assigned.</summary>
-            /// <param name="name">Field name.</param>
-            /// <returns>The value, or null.</returns>
             public object? Get(string name)
             {
                 foreach (var field in _fields)
@@ -159,7 +177,6 @@ namespace Factorio.Data
             }
 
             /// <summary>Writes the table.</summary>
-            /// <param name="writer">The writer.</param>
             public void Write(LuaWriter writer)
             {
                 writer.BeginTable();

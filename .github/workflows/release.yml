@@ -32,7 +32,7 @@ jobs:
             if ("$env:GITHUB_REF" -like "refs/tags/v*") {
               $ver = "$env:GITHUB_REF" -replace '^refs/tags/v',''
             } else {
-              $ver = "1.0.2"
+              $ver = "1.0.3"
             }
           }
           $ver = $ver.TrimStart('v')
@@ -122,7 +122,70 @@ jobs:
               & "$dotnet10Dir\dotnet.exe" new factorio-mod -n GreenMod -o "$smokeDir\GreenMod"
               if ($LASTEXITCODE -ne 0) { throw "dotnet new factorio-mod failed under .NET 10" }
 
-              # Exact command Rider runs when pressing the green Run button right out of the template:
+              # Add real 146x149 PNG + strongly-typed AtmosphericCondenser data stage to GreenMod
+              $pngDir = "$smokeDir\GreenMod\resources\graphics\entity"
+              New-Item -ItemType Directory -Force -Path $pngDir | Out-Null
+              [byte[]]$png = 0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A,0,0,0,13,0x49,0x48,0x44,0x52,0,0,0,146,0,0,0,149
+              [System.IO.File]::WriteAllBytes("$pngDir\atmospheric-condenser.png", $png)
+
+              $modJsonPath = "$smokeDir\GreenMod\mod.json"
+              $modJson = Get-Content $modJsonPath -Raw | ConvertFrom-Json
+              $modJson | Add-Member -NotePropertyName dataEntry -NotePropertyValue "GreenMod.Data.ModData" -Force
+              $modJson | ConvertTo-Json -Depth 10 | Set-Content $modJsonPath -Encoding utf8
+
+              New-Item -ItemType Directory -Force -Path "$smokeDir\GreenMod\data" | Out-Null
+              @'
+              using Factorio.Data;
+              namespace GreenMod.Data;
+              public sealed class ModData : ModDefinition
+              {
+                  public override void Define(ModBuilder mod)
+                  {
+                      mod.Add(new CondenserMachine());
+                      mod.Add(new CondenserItem());
+                      mod.Add(new CondenserRecipe());
+                  }
+              }
+              public sealed class CondenserMachine : AssemblingMachineDefinition
+              {
+                  public CondenserMachine() : base("atmospheric-condenser")
+                  {
+                      LocalisedName = "Atmospheric Condenser";
+                      Icon = Asset.Mod("graphics/entity/atmospheric-condenser.png");
+                      CollisionBox = BoundingBox.Collision(2, 3);
+                      SelectionBox = BoundingBox.Selection(2, 3);
+                      Graphics = GraphicsSet.Auto(Asset.Mod("graphics/entity/atmospheric-condenser.png"), tiles: 3);
+                      CraftingCategories = [CraftingCategory.Chemistry];
+                      CraftingSpeed = 1.0;
+                      EnergyUsage = Energy.Kilowatts(180);
+                      EnergySource = EnergySource.Electric();
+                      FluidBoxes = [FluidBox.Output(FluidId.Water, 100, [PipePort.East(0.5, 0)])];
+                      MinableResult = "atmospheric-condenser";
+                  }
+              }
+              public sealed class CondenserItem : ItemDefinition
+              {
+                  public CondenserItem() : base("atmospheric-condenser")
+                  {
+                      Icon = Asset.Mod("graphics/entity/atmospheric-condenser.png");
+                      StackSize = 10;
+                      Subgroup = Subgroup.ExtractionMachine;
+                      PlaceResult = "atmospheric-condenser";
+                  }
+              }
+              public sealed class CondenserRecipe : RecipeDefinition
+              {
+                  public CondenserRecipe() : base("atmospheric-condenser")
+                  {
+                      Enabled = true;
+                      EnergyRequired = 2;
+                      Ingredients = [Ingredient.Item("iron-plate", 10)];
+                      Results = [Product.Item("atmospheric-condenser", 1)];
+                  }
+              }
+              '@ | Set-Content "$smokeDir\GreenMod\data\ModData.cs" -Encoding utf8
+
+              # Exact command Rider runs when pressing the green Run button:
               & "$dotnet10Dir\dotnet.exe" run --project "$smokeDir\GreenMod\GreenMod.csproj"
               if ($LASTEXITCODE -ne 0) { throw "dotnet run GreenMod.csproj failed under .NET 10" }
 
@@ -130,6 +193,12 @@ jobs:
               $deployedZip = "$factorioAppData\mods\GreenMod_0.1.0.zip"
               if (-not (Test-Path $builtZip)) { throw "Expected built zip not found: $builtZip" }
               if (-not (Test-Path $deployedZip)) { throw "Expected deployed zip in Factorio mods dir not found: $deployedZip" }
+
+              Expand-Archive -Path $deployedZip -DestinationPath "$smokeDir\unzipped" -Force
+              $dataLua = Get-Content "$smokeDir\unzipped\GreenMod_0.1.0\data.lua" -Raw
+              if ($dataLua -notmatch 'width = 146' -or $dataLua -notmatch 'height = 149' -or $dataLua -notmatch 'icon_size = 146') {
+                throw "Auto-scaled PNG dimensions missing from generated data.lua:`n$dataLua"
+              }
             } finally {
               Pop-Location
             }

@@ -6,26 +6,6 @@ namespace Factorio.Data
 {
     /// <summary>
     /// A recipe: what a machine turns into what.
-    /// <para>
-    /// The recipe's categories decide which machines can run it, and a machine's
-    /// <see cref="AssemblingMachineDefinition.CraftingCategories"/> decides which recipes it accepts;
-    /// if the two do not meet, the recipe can never be crafted. The build checks that every category
-    /// a recipe names exists - either in the base game or as a
-    /// <see cref="RecipeCategoryDefinition"/> of the same mod.
-    /// </para>
-    /// <code>
-    /// public sealed class PolymerRecipe : RecipeDefinition
-    /// {
-    ///     public PolymerRecipe() : base("demo-polymer-pellet")
-    ///     {
-    ///         Categories = ["chemistry"];
-    ///         Enabled = true;
-    ///         EnergyRequired = 2;
-    ///         Ingredients = [Ingredient.Item("iron-plate", 2), Ingredient.Fluid("demo-coolant", 25)];
-    ///         Results = [Product.Item("demo-polymer-pellet", 1)];
-    ///     }
-    /// }
-    /// </code>
     /// </summary>
     public class RecipeDefinition : PrototypeDefinition
     {
@@ -36,16 +16,11 @@ namespace Factorio.Data
         }
 
         /// <summary>
-        /// The categories this recipe belongs to, e.g. <c>["chemistry"]</c>. One is the usual case.
-        /// <para>
-        /// Written as <c>category</c> plus <c>additional_categories</c> for Factorio 2.0 and as
-        /// <c>categories</c> for 2.1, because that is the spelling each version reads - a mod that
-        /// declared 2.0 but wrote <c>categories</c> would load with a recipe no machine can make.
-        /// </para>
+        /// The categories this recipe belongs to, e.g. <c>[CraftingCategory.Chemistry]</c> or <c>["atmospheric"]</c>.
         /// </summary>
-        public Values? Categories
+        public CategoryList? Categories
         {
-            get => Get("categories") as Values;
+            get => Get("categories") as CategoryList;
             set => Set("categories", value);
         }
 
@@ -63,28 +38,28 @@ namespace Factorio.Data
             set => Set("energy_required", value);
         }
 
-        /// <summary>What one craft consumes: <c>[Ingredient.Item("iron-plate", 2)]</c>.</summary>
-        public Values? Ingredients
+        /// <summary>What one craft consumes: <c>[Ingredient.Item("iron-plate", 2)]</c> (or <c>[]</c>).</summary>
+        public RecipeValueList? Ingredients
         {
-            get => Get("ingredients") as Values;
+            get => Get("ingredients") as RecipeValueList;
             set => Set("ingredients", value);
         }
 
-        /// <summary>What one craft produces: <c>[Product.Item("demo-pellet", 1)]</c>.</summary>
-        public Values? Results
+        /// <summary>What one craft produces: <c>[Product.Item("atmospheric-condenser", 1)]</c>.</summary>
+        public RecipeValueList? Results
         {
-            get => Get("results") as Values;
+            get => Get("results") as RecipeValueList;
             set => Set("results", value);
         }
 
-        /// <summary>How many seconds of research unlock the recipe; 0 makes it a starting recipe.</summary>
+        /// <summary>Seconds of research to unlock the recipe.</summary>
         public double ResearchTime
         {
             get => Number("research_time");
             set => Set("research_time", value);
         }
 
-        /// <summary>The product shown as the recipe's icon and name in the crafting menu.</summary>
+        /// <summary>The primary product name shown as the recipe's icon and name in the crafting menu.</summary>
         public string? MainProduct
         {
             get => Get("main_product") as string;
@@ -99,7 +74,6 @@ namespace Factorio.Data
         }
 
         /// <summary>Writes the recipe, spelling the category list the way the target version reads it.</summary>
-        /// <param name="writer">The writer, which knows the target version.</param>
         protected override void WriteField(LuaWriter writer, string name, object? value)
         {
             if (name != "categories")
@@ -108,7 +82,13 @@ namespace Factorio.Data
                 return;
             }
 
-            var categories = (value as Values)?.ToList() ?? new List<object?>();
+            var categories = value switch
+            {
+                CategoryList typed => typed.Select(c => (object?)c.Name).ToList(),
+                Values untyped => untyped.ToList(),
+                _ => new List<object?>(),
+            };
+
             if (writer.ApiVersion != "2.0")
             {
                 writer.Key("categories");
@@ -130,13 +110,7 @@ namespace Factorio.Data
     }
 
     /// <summary>
-    /// A recipe category: a set of recipes a kind of machine can run.
-    /// <para>
-    /// The base game's categories (<c>crafting</c>, <c>chemistry</c>, <c>smelting</c>, ...) exist
-    /// already and need no declaration. A mod that invents one - say <c>gas-extraction</c> - has to
-    /// declare it: a recipe whose category no prototype defines stops the game with
-    /// "recipe-category with name ... does not exist".
-    /// </para>
+    /// A custom recipe category: e.g. <c>new RecipeCategoryDefinition("atmospheric-condensation")</c>.
     /// </summary>
     public class RecipeCategoryDefinition : PrototypeDefinition
     {

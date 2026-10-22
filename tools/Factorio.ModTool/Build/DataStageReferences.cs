@@ -8,6 +8,11 @@ namespace Factorio.ModTool.Build;
 /// </summary>
 public static class DataStageReferences
 {
+    private static readonly HashSet<string> ItemPrototypeTypes = new(StringComparer.Ordinal)
+    {
+        "item", "item-with-entity-data", "tool", "ammo", "capsule", "gun", "armor", "module", "rail-planner",
+    };
+
     public static void Check(
         IReadOnlyList<DataStage.Shape> shapes,
         bool hasForeignDependencies,
@@ -18,9 +23,13 @@ public static class DataStageReferences
         var recipeCategories = new HashSet<string>(VanillaGroups.RecipeCategories, StringComparer.Ordinal);
         var groups = new HashSet<string>(VanillaGroups.Groups, StringComparer.Ordinal);
         var subgroups = new HashSet<string>(VanillaGroups.Subgroups.Keys, StringComparer.Ordinal);
+        var modItems = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var shape in shapes)
         {
+            if (ItemPrototypeTypes.Contains(shape.Type))
+                modItems.Add(shape.Name);
+
             switch (shape.Type)
             {
                 case "recipe-category":
@@ -88,6 +97,25 @@ public static class DataStageReferences
                         0,
                         $"{shape.Type} {shape.Name}: subgroup '{sub}' is not an item-subgroup " +
                         $"(Factorio stops with \"Error in assignID: item-subgroup with name '{sub}' does not exist\")"));
+                }
+            }
+
+            // 4. Custom entity setting minable.result = "<own-name>" without adding its ItemDefinition
+            if (root.TryGetProperty("minable", out var minableEl) &&
+                minableEl.ValueKind == JsonValueKind.Object &&
+                minableEl.TryGetProperty("result", out var minableResEl) &&
+                minableResEl.ValueKind == JsonValueKind.String)
+            {
+                var itemName = minableResEl.GetString()!;
+                if (string.Equals(itemName, shape.Name, StringComparison.Ordinal) &&
+                    !modItems.Contains(itemName))
+                {
+                    findings.Add(new LuaCheck.Finding(
+                        "data.lua",
+                        0,
+                        $"{shape.Type} {shape.Name}: minable.result names item '{itemName}', which is not defined " +
+                        $"(Factorio stops with \"Error in assignID: item with name '{itemName}' does not exist\"; " +
+                        $"define an ItemDefinition with PlaceResult = \"{shape.Name}\" and register it via mod.Add(...))"));
                 }
             }
         }
