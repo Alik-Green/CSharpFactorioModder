@@ -60,7 +60,7 @@ namespace Factorio.Data
 
         /// <summary>Implicitly unwraps to its string prototype name.</summary>
         /// @CSharpLua.Template = "{0}"
-        public static implicit operator string?(ItemId? id) => id?.Name;
+        public static implicit operator string(ItemId id) => id.Name;
 
         /// <summary>References any item prototype by name.</summary>
         /// @CSharpLua.Template = "{0}"
@@ -81,7 +81,7 @@ namespace Factorio.Data
 
         /// <summary>Implicitly unwraps to its string prototype name.</summary>
         /// @CSharpLua.Template = "{0}"
-        public static implicit operator string?(EntityId? id) => id?.Name;
+        public static implicit operator string(EntityId id) => id.Name;
 
         /// <summary>References any entity prototype by name.</summary>
         /// @CSharpLua.Template = "{0}"
@@ -114,7 +114,7 @@ namespace Factorio.Data
 
         /// <summary>Implicitly unwraps to its string fluid name.</summary>
         /// @CSharpLua.Template = "{0}"
-        public static implicit operator string?(FluidId? id) => id?.Name;
+        public static implicit operator string(FluidId id) => id.Name;
 
         /// <summary>References any fluid prototype by name.</summary>
         /// @CSharpLua.Template = "{0}"
@@ -167,7 +167,7 @@ namespace Factorio.Data
 
         /// <summary>Implicitly unwraps to its string recipe name.</summary>
         /// @CSharpLua.Template = "{0}"
-        public static implicit operator string?(RecipeId? id) => id?.Name;
+        public static implicit operator string(RecipeId id) => id.Name;
 
         /// <summary>References any recipe prototype by name.</summary>
         /// @CSharpLua.Template = "{0}"
@@ -202,7 +202,7 @@ namespace Factorio.Data
 
         /// <summary>Implicitly converts to its string prototype name.</summary>
         /// @CSharpLua.Template = "{0}"
-        public static implicit operator string?(VanillaPrototype? prototype) => prototype?.Name;
+        public static implicit operator string(VanillaPrototype prototype) => prototype.Name;
 
         /// <summary>Implicitly converts to an <see cref="EntityId"/>.</summary>
         /// @CSharpLua.Template = "{0}"

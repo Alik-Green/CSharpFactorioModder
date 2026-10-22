@@ -12,7 +12,7 @@ namespace Factorio.ModTool.Tests;
 
 public sealed class VanillaCatalogAndQoLTests
 {
-    private static readonly ToolchainSettings Settings = ToolchainSettings.Load(FindRoot());
+    private static readonly ToolchainSettings Settings = ToolchainSettings.Locate(FindRoot());
 
     private static string FindRoot()
     {

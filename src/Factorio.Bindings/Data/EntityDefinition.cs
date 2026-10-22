@@ -71,6 +71,8 @@ namespace Factorio.Data
                     Results = [Product.Item(self.Name, resultCount)],
                 };
                 if (categories != null) recipe.Categories = categories;
+                if (self.LocalisedName != null) recipe.LocalisedName = self.LocalisedName;
+                if (self.LocalisedDescription != null) recipe.LocalisedDescription = self.LocalisedDescription;
 
                 return new PrototypeDefinition[] { item, recipe };
             };

@@ -11,6 +11,7 @@ namespace Factorio.Data
     public sealed partial class TechnologyId : PrototypeName
     {
         /// <summary>Creates a technology prototype reference.</summary>
+        /// @CSharpLua.Template = "{0}"
         public TechnologyId(string name) : base(name) { }
 
         /// <summary>Implicitly wraps a string technology name.</summary>
@@ -19,7 +20,7 @@ namespace Factorio.Data
 
         /// <summary>Implicitly unwraps to its string technology name.</summary>
         /// @CSharpLua.Template = "{0}"
-        public static implicit operator string?(TechnologyId? id) => id?.Name;
+        public static implicit operator string(TechnologyId id) => id.Name;
 
         /// <summary>References any technology prototype by name.</summary>
         /// @CSharpLua.Template = "{0}"
@@ -1452,6 +1453,9 @@ namespace Factorio.Data
             /// <summary>Prototype <c>"cluster-nuke-explosion"</c> (explosion).</summary>
             /// @CSharpLua.Get = "\"cluster-nuke-explosion\""
             public static VanillaPrototype ClusterNukeExplosion { get; } = new("explosion", "cluster-nuke-explosion");
+            /// <summary>Prototype <c>"coal"</c> (resource).</summary>
+            /// @CSharpLua.Get = "\"coal\""
+            public static VanillaPrototype Coal { get; } = new("resource", "coal");
             /// <summary>Prototype <c>"compi-speech-bubble"</c> (speech-bubble).</summary>
             /// @CSharpLua.Get = "\"compi-speech-bubble\""
             public static VanillaPrototype CompiSpeechBubble { get; } = new("speech-bubble", "compi-speech-bubble");
@@ -1473,6 +1477,9 @@ namespace Factorio.Data
             /// <summary>Prototype <c>"construction-robot-remnants"</c> (corpse).</summary>
             /// @CSharpLua.Get = "\"construction-robot-remnants\""
             public static VanillaPrototype ConstructionRobotRemnants { get; } = new("corpse", "construction-robot-remnants");
+            /// <summary>Prototype <c>"copper-ore"</c> (resource).</summary>
+            /// @CSharpLua.Get = "\"copper-ore\""
+            public static VanillaPrototype CopperOre { get; } = new("resource", "copper-ore");
             /// <summary>Prototype <c>"crash-site-chest-1"</c> (container).</summary>
             /// @CSharpLua.Get = "\"crash-site-chest-1\""
             public static VanillaPrototype CrashSiteChest1 { get; } = new("container", "crash-site-chest-1");
@@ -1902,6 +1909,9 @@ namespace Factorio.Data
             /// <summary>Prototype <c>"iron-chest-remnants"</c> (corpse).</summary>
             /// @CSharpLua.Get = "\"iron-chest-remnants\""
             public static VanillaPrototype IronChestRemnants { get; } = new("corpse", "iron-chest-remnants");
+            /// <summary>Prototype <c>"iron-ore"</c> (resource).</summary>
+            /// @CSharpLua.Get = "\"iron-ore\""
+            public static VanillaPrototype IronOre { get; } = new("resource", "iron-ore");
             /// <summary>Prototype <c>"item-on-ground"</c> (item-entity).</summary>
             /// @CSharpLua.Get = "\"item-on-ground\""
             public static VanillaPrototype ItemOnGround { get; } = new("item-entity", "item-on-ground");
@@ -2406,6 +2416,9 @@ namespace Factorio.Data
             /// <summary>Prototype <c>"steel-furnace-remnants"</c> (corpse).</summary>
             /// @CSharpLua.Get = "\"steel-furnace-remnants\""
             public static VanillaPrototype SteelFurnaceRemnants { get; } = new("corpse", "steel-furnace-remnants");
+            /// <summary>Prototype <c>"stone"</c> (resource).</summary>
+            /// @CSharpLua.Get = "\"stone\""
+            public static VanillaPrototype Stone { get; } = new("resource", "stone");
             /// <summary>Prototype <c>"stone-furnace"</c> (furnace).</summary>
             /// @CSharpLua.Get = "\"stone-furnace\""
             public static VanillaPrototype StoneFurnace { get; } = new("furnace", "stone-furnace");
@@ -4201,6 +4214,9 @@ namespace Factorio.Data
                 /// <summary>Prototype <c>"boompuff-seed"</c> (projectile).</summary>
                 /// @CSharpLua.Get = "\"boompuff-seed\""
                 public static VanillaPrototype BoompuffSeed { get; } = new("projectile", "boompuff-seed");
+                /// <summary>Prototype <c>"calcite"</c> (resource).</summary>
+                /// @CSharpLua.Get = "\"calcite\""
+                public static VanillaPrototype Calcite { get; } = new("resource", "calcite");
                 /// <summary>Prototype <c>"captive-biter-spawner"</c> (assembling-machine).</summary>
                 /// @CSharpLua.Get = "\"captive-biter-spawner\""
                 public static VanillaPrototype CaptiveBiterSpawner { get; } = new("assembling-machine", "captive-biter-spawner");
@@ -4495,6 +4511,9 @@ namespace Factorio.Data
                 /// <summary>Prototype <c>"rocket-turret-remnants"</c> (corpse).</summary>
                 /// @CSharpLua.Get = "\"rocket-turret-remnants\""
                 public static VanillaPrototype RocketTurretRemnants { get; } = new("corpse", "rocket-turret-remnants");
+                /// <summary>Prototype <c>"scrap"</c> (resource).</summary>
+                /// @CSharpLua.Get = "\"scrap\""
+                public static VanillaPrototype Scrap { get; } = new("resource", "scrap");
                 /// <summary>Prototype <c>"slipstack"</c> (tree).</summary>
                 /// @CSharpLua.Get = "\"slipstack\""
                 public static VanillaPrototype Slipstack { get; } = new("tree", "slipstack");
@@ -4555,6 +4574,9 @@ namespace Factorio.Data
                 /// <summary>Prototype <c>"tree-plant"</c> (plant).</summary>
                 /// @CSharpLua.Get = "\"tree-plant\""
                 public static VanillaPrototype TreePlant { get; } = new("plant", "tree-plant");
+                /// <summary>Prototype <c>"tungsten-ore"</c> (resource).</summary>
+                /// @CSharpLua.Get = "\"tungsten-ore\""
+                public static VanillaPrototype TungstenOre { get; } = new("resource", "tungsten-ore");
                 /// <summary>Prototype <c>"turbo-loader"</c> (loader).</summary>
                 /// @CSharpLua.Get = "\"turbo-loader\""
                 public static VanillaPrototype TurboLoader { get; } = new("loader", "turbo-loader");
