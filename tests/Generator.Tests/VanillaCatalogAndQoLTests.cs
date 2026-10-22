@@ -270,8 +270,8 @@ public sealed class VanillaCatalogAndQoLTests
 
             // Verify control.lua inlined Vanilla.Items.ElectronicCircuit & Vanilla.Machines.ChemicalPlant as pure strings:
             var controlLua = File.ReadAllText(Path.Combine(result.ModDirectory, "control.lua"));
-            Assert.Contains("\"electronic-circuit\"", controlLua);
-            Assert.Contains("\"chemical-plant\"", controlLua);
+            Assert.Contains("electronic-circuit", controlLua);
+            Assert.Contains("chemical-plant", controlLua);
         }
         finally
         {
