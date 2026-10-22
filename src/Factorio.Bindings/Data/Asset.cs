@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 namespace Factorio.Data
 {
@@ -13,16 +14,27 @@ namespace Factorio.Data
     /// </summary>
     public static class Asset
     {
+        private static readonly AsyncLocal<string?> CurrentSource = new();
+        private static readonly AsyncLocal<IReadOnlyList<string>?> CurrentResourceRoots = new();
+
         /// <summary>
         /// Current mod name supplied by the data-stage generator while evaluating <see cref="ModDefinition.Define"/>.
         /// </summary>
-        public static string? Source { get; set; }
+        public static string? Source
+        {
+            get => CurrentSource.Value;
+            set => CurrentSource.Value = value;
+        }
 
         /// <summary>
         /// Resource root directories (e.g. <c>&lt;mod&gt;/resources</c>) set during build so sprites
         /// and icons can inspect real PNG pixel dimensions automatically.
         /// </summary>
-        public static IReadOnlyList<string>? ResourceRoots { get; set; }
+        public static IReadOnlyList<string>? ResourceRoots
+        {
+            get => CurrentResourceRoots.Value;
+            set => CurrentResourceRoots.Value = value;
+        }
 
         /// <summary>Prefixes a mod-local asset path with <c>__&lt;Source&gt;__/</c> unless already prefixed.</summary>
         public static string Mod(string path)

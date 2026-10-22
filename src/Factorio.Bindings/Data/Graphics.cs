@@ -217,10 +217,10 @@ namespace Factorio.Data
 
                     double rawScale = _align switch
                     {
-                        // Footprint: if the building is taller than the footprint aspect ratio (standard
-                        // Factorio 45° building with roof/tower/chimney), match width cleanly to tilesWide
-                        // so the base fills its horizontal grid tiles instead of shrinking!
-                        SpriteAlign.Footprint when (contentH / contentW) > (desiredPxH / desiredPxW) =>
+                        // Footprint: when the building is meaningfully taller than the footprint aspect ratio
+                        // (standard Factorio 45° building with roof/tower/chimney), match width cleanly to
+                        // tilesWide so the base fills its horizontal grid tiles instead of shrinking!
+                        SpriteAlign.Footprint when (contentH / contentW) > 1.08 * (desiredPxH / desiredPxW) =>
                             desiredPxW / contentW,
                         _ => Math.Min(desiredPxW / contentW, desiredPxH / contentH),
                     };
