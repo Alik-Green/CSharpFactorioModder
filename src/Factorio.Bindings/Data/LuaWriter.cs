@@ -120,6 +120,10 @@ namespace Factorio.Data
 
         private void Open(bool isArray)
         {
+            if (_entries.Count > 0 && IsArrayEntry() && _lineHasContent)
+            {
+                StartEntry();
+            }
             _out.Append('{');
             _lineHasContent = true;
             _entries.Push(0);
