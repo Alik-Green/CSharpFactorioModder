@@ -67,8 +67,7 @@ public sealed class TranspilerFixture : IDisposable
         .GetFiles(Path.Combine(Root, "src/Factorio.Bindings/Utilities"), "*.cs")
         .Concat(new[]
         {
-            Path.Combine(Root, "src/Factorio.Bindings/Data/VanillaCore.cs"),
-            Path.Combine(Root, "src/Factorio.Bindings/Data/VanillaCatalog.cs"),
+            Path.Combine(Root, "src/Factorio.Bindings/RuntimeStubs/VanillaRuntime.cs"),
         })
         .OrderBy(f => f, StringComparer.Ordinal).ToList();
     public string ExampleMod => Path.Combine(Root, "mods/HelloFactorio/src/HelloFactorio.cs");

@@ -245,12 +245,9 @@ public static class ModBuilder
                 inputs.Add(compatFile);
 
             // Expose Vanilla.* prototype constants cleanly to runtime C# scripts too (zero emitted code).
-            foreach (var sharedDataFile in new[] { "VanillaCore.cs", "VanillaCatalog.cs" })
-            {
-                var path = Path.Combine(bindingsBase, "Data", sharedDataFile);
-                if (File.Exists(path))
-                    inputs.Add(path);
-            }
+            var vanillaRuntime = Path.Combine(bindingsBase, "RuntimeStubs", "VanillaRuntime.cs");
+            if (File.Exists(vanillaRuntime))
+                inputs.Add(vanillaRuntime);
         }
 
         inputs.AddRange(project.SourceFiles());
