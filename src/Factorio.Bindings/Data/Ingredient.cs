@@ -89,7 +89,7 @@ namespace Factorio.Data
     /// Strongly-typed collection of recipe ingredients or products (<c>[Ingredient.Item(...), Ingredient.Fluid(...)]</c>).
     /// </summary>
     [CollectionBuilder(typeof(RecipeValueList), nameof(Create))]
-    public sealed class RecipeValueList : ILuaValue, IEnumerable<object?>
+    public sealed class RecipeValueList : ILuaValue, IEnumerable<RecipeValue>
     {
         private readonly List<object?> _items = new();
 
@@ -130,7 +130,13 @@ namespace Factorio.Data
         }
 
         /// <inheritdoc />
-        public IEnumerator<object?> GetEnumerator() => _items.GetEnumerator();
+        public IEnumerator<RecipeValue> GetEnumerator()
+        {
+            foreach (var item in _items)
+            {
+                if (item is RecipeValue rv) yield return rv;
+            }
+        }
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
