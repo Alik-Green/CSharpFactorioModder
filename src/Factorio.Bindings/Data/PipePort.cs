@@ -16,40 +16,42 @@ namespace Factorio.Data
     /// </summary>
     public sealed class PipePort : ILuaValue
     {
-        private readonly int _direction;
+        private readonly string _direction;
         private readonly double _x;
         private readonly double _y;
 
-        private PipePort(int direction, double x, double y)
+        private PipePort(string direction, double x, double y)
         {
             _direction = direction;
             _x = x;
             _y = y;
         }
 
-        /// <summary>A pipe leaving the north side of the machine (direction = 0).</summary>
-        public static PipePort North(double x = 0, double y = -1) => new(0, x, y);
+        /// <summary>A pipe leaving the north side of the machine (<c>defines.direction.north</c>).</summary>
+        public static PipePort North(double x = 0, double y = -1) => new("north", x, y);
 
-        /// <summary>A pipe leaving the east side of the machine (direction = 4).</summary>
-        public static PipePort East(double x = 1, double y = 0) => new(4, x, y);
+        /// <summary>A pipe leaving the east side of the machine (<c>defines.direction.east</c>).</summary>
+        public static PipePort East(double x = 1, double y = 0) => new("east", x, y);
 
-        /// <summary>A pipe leaving the south side of the machine (direction = 8).</summary>
-        public static PipePort South(double x = 0, double y = 1) => new(8, x, y);
+        /// <summary>A pipe leaving the south side of the machine (<c>defines.direction.south</c>).</summary>
+        public static PipePort South(double x = 0, double y = 1) => new("south", x, y);
 
-        /// <summary>A pipe leaving the west side of the machine (direction = 12).</summary>
-        public static PipePort West(double x = -1, double y = 0) => new(12, x, y);
+        /// <summary>A pipe leaving the west side of the machine (<c>defines.direction.west</c>).</summary>
+        public static PipePort West(double x = -1, double y = 0) => new("west", x, y);
 
-        /// <summary>Writes the pipe connection table.</summary>
+        /// <summary>Writes <c>{ direction = defines.direction.north, position = { x = ..., y = ... } }</c>.</summary>
         public void Write(LuaWriter writer)
         {
             writer.BeginTable();
             writer.Key("direction");
-            writer.Value(_direction);
+            writer.Raw("defines.direction." + _direction);
             writer.Key("position");
-            writer.BeginArray();
+            writer.BeginTable();
+            writer.Key("x");
             writer.Value(_x);
+            writer.Key("y");
             writer.Value(_y);
-            writer.EndArray();
+            writer.EndTable();
             writer.EndTable();
         }
     }

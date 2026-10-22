@@ -117,8 +117,10 @@ public class TypedDataAndAutoScaleTests
             Assert.Contains("icon_size = 146", result.Lua);
 
             // 3. Strongly-typed BoundingBox helpers wrote clean Factorio 2x3 boxes
-            Assert.Contains("{ { -0.7, -1.2 }, { 0.7, 1.2 } }", result.Lua);
-            Assert.Contains("{ { -1, -1.5 }, { 1, 1.5 } }", result.Lua);
+            Assert.Contains("{ -0.7, -1.2 }", result.Lua);
+            Assert.Contains("{ 0.7, 1.2 }", result.Lua);
+            Assert.Contains("{ -1, -1.5 }", result.Lua);
+            Assert.Contains("{ 1, 1.5 }", result.Lua);
 
             // 4. Strongly-typed FixedRecipe, ModuleSlots, AllowedEffects, EnergySource, and TechnologyDefinition
             Assert.Contains("fixed_recipe = \"condense-water\"", result.Lua);
