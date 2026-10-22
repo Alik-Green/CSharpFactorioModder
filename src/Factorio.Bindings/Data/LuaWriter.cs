@@ -160,6 +160,9 @@ namespace Factorio.Data
                 case string text:
                     _out.Append(Quote(text));
                     break;
+                case PrototypeName named:
+                    _out.Append(Quote(named.Name));
+                    break;
                 case bool flag:
                     _out.Append(flag ? "true" : "false");
                     break;
