@@ -78,9 +78,9 @@ jobs:
           Run-Logged "Generator.Tests" { dotnet test tests\Generator.Tests -c Release --nologo }
           Run-Logged "Transpile.Tests" { dotnet test tests\Transpile.Tests -c Release --nologo }
           Run-Logged "Analyzer.Tests" { dotnet test tests\Analyzer.Tests -c Release --nologo }
-          Run-Logged "dotnet build HelloFactorio" { dotnet build mods\HelloFactorio\HelloFactorio.csproj -c Release --nologo }
-          Run-Logged "dotnet build DemoChemistry" { dotnet build mods\DemoChemistry\DemoChemistry.csproj -c Release --nologo }
-          Run-Logged "dotnet build GasExtractor" { dotnet build mods\GasExtractor\GasExtractor.csproj -c Release --nologo }
+          Run-Logged "dotnet build HelloFactorio" { dotnet build mods\HelloFactorio\HelloFactorio.csproj -c Release --nologo -p:WarningLevel=0 }
+          Run-Logged "dotnet build DemoChemistry" { dotnet build mods\DemoChemistry\DemoChemistry.csproj -c Release --nologo -p:WarningLevel=0 }
+          Run-Logged "dotnet build GasExtractor" { dotnet build mods\GasExtractor\GasExtractor.csproj -c Release --nologo -p:WarningLevel=0 }
           Run-Logged "installer/build.cmd" { cmd /c "installer\build.cmd ${{ steps.meta.outputs.version }}" }
 
       - name: Smoke-test Rider Run button & IntelliSense DLL on isolated .NET 10 SDK
@@ -128,58 +128,59 @@ jobs:
               [byte[]]$png = 0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A,0,0,0,13,0x49,0x48,0x44,0x52,0,0,0,146,0,0,0,149
               [System.IO.File]::WriteAllBytes("$pngDir\atmospheric-condenser.png", $png)
 
-              @'
-              using Factorio.Data;
-              namespace GreenMod;
-              public sealed class ExampleMod : ModDefinition
-              {
-                  public override void Define(ModBuilder mod)
-                  {
-                      mod.Add(new CondenserMachine());
-                      mod.Add(new CondenserItem());
-                      mod.Add(new CondenserRecipe());
-                  }
-              }
-              public sealed class CondenserMachine : AssemblingMachineDefinition
-              {
-                  public CondenserMachine() : base("atmospheric-condenser")
-                  {
-                      LocalisedName = "Atmospheric Condenser";
-                      Icon = Asset.Mod("graphics/entity/atmospheric-condenser.png");
-                      CollisionBox = BoundingBox.Collision(2, 3);
-                      SelectionBox = BoundingBox.Selection(2, 3);
-                      Graphics = GraphicsSet.Auto(Asset.Mod("graphics/entity/atmospheric-condenser.png"), tiles: 3);
-                      CraftingCategories = [CraftingCategory.Chemistry];
-                      CraftingSpeed = 1.0;
-                      EnergyUsage = Energy.Kilowatts(180);
-                      EnergySource = EnergySource.Electric();
-                      FluidBoxes = [FluidBox.Output(FluidId.Water, 100, [PipePort.East(0.5, 0)])];
-                      MinableResult = "atmospheric-condenser";
-                  }
-              }
-              public sealed class CondenserItem : ItemDefinition
-              {
-                  public CondenserItem() : base("atmospheric-condenser")
-                  {
-                      LocalisedName = "Atmospheric Condenser";
-                      Icon = Asset.Mod("graphics/entity/atmospheric-condenser.png");
-                      StackSize = 10;
-                      Subgroup = Subgroup.ExtractionMachine;
-                      PlaceResult = "atmospheric-condenser";
-                  }
-              }
-              public sealed class CondenserRecipe : RecipeDefinition
-              {
-                  public CondenserRecipe() : base("atmospheric-condenser")
-                  {
-                      LocalisedName = "Atmospheric Condenser";
-                      Enabled = true;
-                      EnergyRequired = 2;
-                      Ingredients = [Ingredient.Item("iron-plate", 10)];
-                      Results = [Product.Item("atmospheric-condenser", 1)];
-                  }
-              }
-              '@ | Set-Content "$smokeDir\GreenMod\data\ExampleMod.cs" -Encoding utf8
+              $codeLines = @(
+                'using Factorio.Data;'
+                'namespace GreenMod;'
+                'public sealed class ExampleMod : ModDefinition'
+                '{'
+                '    public override void Define(ModBuilder mod)'
+                '    {'
+                '        mod.Add(new CondenserMachine());'
+                '        mod.Add(new CondenserItem());'
+                '        mod.Add(new CondenserRecipe());'
+                '    }'
+                '}'
+                'public sealed class CondenserMachine : AssemblingMachineDefinition'
+                '{'
+                '    public CondenserMachine() : base("atmospheric-condenser")'
+                '    {'
+                '        LocalisedName = "Atmospheric Condenser";'
+                '        Icon = Asset.Mod("graphics/entity/atmospheric-condenser.png");'
+                '        CollisionBox = BoundingBox.Collision(2, 3);'
+                '        SelectionBox = BoundingBox.Selection(2, 3);'
+                '        Graphics = GraphicsSet.Auto(Asset.Mod("graphics/entity/atmospheric-condenser.png"), tiles: 3);'
+                '        CraftingCategories = [CraftingCategory.Chemistry];'
+                '        CraftingSpeed = 1.0;'
+                '        EnergyUsage = Energy.Kilowatts(180);'
+                '        EnergySource = EnergySource.Electric();'
+                '        FluidBoxes = [FluidBox.Output(FluidId.Water, 100, [PipePort.East(0.5, 0)])];'
+                '        MinableResult = "atmospheric-condenser";'
+                '    }'
+                '}'
+                'public sealed class CondenserItem : ItemDefinition'
+                '{'
+                '    public CondenserItem() : base("atmospheric-condenser")'
+                '    {'
+                '        LocalisedName = "Atmospheric Condenser";'
+                '        Icon = Asset.Mod("graphics/entity/atmospheric-condenser.png");'
+                '        StackSize = 10;'
+                '        Subgroup = Subgroup.ExtractionMachine;'
+                '        PlaceResult = "atmospheric-condenser";'
+                '    }'
+                '}'
+                'public sealed class CondenserRecipe : RecipeDefinition'
+                '{'
+                '    public CondenserRecipe() : base("atmospheric-condenser")'
+                '    {'
+                '        LocalisedName = "Atmospheric Condenser";'
+                '        Enabled = true;'
+                '        EnergyRequired = 2;'
+                '        Ingredients = [Ingredient.Item("iron-plate", 10)];'
+                '        Results = [Product.Item("atmospheric-condenser", 1)];'
+                '    }'
+                '}'
+              )
+              [System.IO.File]::WriteAllLines("$smokeDir\GreenMod\data\ExampleMod.cs", $codeLines)
 
               # Exact command Rider runs when pressing the green Run button:
               $ErrorActionPreference = 'Continue'
