@@ -204,7 +204,7 @@ public class TypedDataAndAutoScaleTests
 
         var shapes = new List<DataStage.Shape>
         {
-            new("assembling-machine", "atmospheric-condenser", doc.RootElement.Clone()),
+            new("assembling-machine", "atmospheric-condenser", Array.Empty<string>(), doc.RootElement.Clone()),
         };
 
         var findings = new List<LuaCheck.Finding>();
