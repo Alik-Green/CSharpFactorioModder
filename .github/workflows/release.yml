@@ -128,16 +128,10 @@ jobs:
               [byte[]]$png = 0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A,0,0,0,13,0x49,0x48,0x44,0x52,0,0,0,146,0,0,0,149
               [System.IO.File]::WriteAllBytes("$pngDir\atmospheric-condenser.png", $png)
 
-              $modJsonPath = "$smokeDir\GreenMod\mod.json"
-              $modJson = Get-Content $modJsonPath -Raw | ConvertFrom-Json
-              $modJson | Add-Member -NotePropertyName dataEntry -NotePropertyValue "GreenMod.Data.ModData" -Force
-              $modJson | ConvertTo-Json -Depth 10 | Set-Content $modJsonPath -Encoding utf8
-
-              New-Item -ItemType Directory -Force -Path "$smokeDir\GreenMod\data" | Out-Null
               @'
               using Factorio.Data;
-              namespace GreenMod.Data;
-              public sealed class ModData : ModDefinition
+              namespace GreenMod;
+              public sealed class ExampleMod : ModDefinition
               {
                   public override void Define(ModBuilder mod)
                   {
@@ -167,6 +161,7 @@ jobs:
               {
                   public CondenserItem() : base("atmospheric-condenser")
                   {
+                      LocalisedName = "Atmospheric Condenser";
                       Icon = Asset.Mod("graphics/entity/atmospheric-condenser.png");
                       StackSize = 10;
                       Subgroup = Subgroup.ExtractionMachine;
@@ -177,17 +172,21 @@ jobs:
               {
                   public CondenserRecipe() : base("atmospheric-condenser")
                   {
+                      LocalisedName = "Atmospheric Condenser";
                       Enabled = true;
                       EnergyRequired = 2;
                       Ingredients = [Ingredient.Item("iron-plate", 10)];
                       Results = [Product.Item("atmospheric-condenser", 1)];
                   }
               }
-              '@ | Set-Content "$smokeDir\GreenMod\data\ModData.cs" -Encoding utf8
+              '@ | Set-Content "$smokeDir\GreenMod\data\ExampleMod.cs" -Encoding utf8
 
               # Exact command Rider runs when pressing the green Run button:
-              & "$dotnet10Dir\dotnet.exe" run --project "$smokeDir\GreenMod\GreenMod.csproj"
-              if ($LASTEXITCODE -ne 0) { throw "dotnet run GreenMod.csproj failed under .NET 10" }
+              $ErrorActionPreference = 'Continue'
+              $runOut = & "$dotnet10Dir\dotnet.exe" run --project "$smokeDir\GreenMod\GreenMod.csproj" 2>&1 | Out-String
+              $runCode = $LASTEXITCODE
+              Write-Host $runOut
+              if ($runCode -ne 0) { throw "dotnet run GreenMod.csproj failed ($runCode):`n$runOut" }
 
               $builtZip = "$smokeDir\GreenMod\build\mods\GreenMod_0.1.0.zip"
               $deployedZip = "$factorioAppData\mods\GreenMod_0.1.0.zip"
